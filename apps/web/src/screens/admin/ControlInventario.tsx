@@ -8,7 +8,7 @@
 //    previa, para revisión posterior de Dirección.
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
-import { PageHead } from '../../app/PageHead'
+import { QueEs, QueEsParte } from '../../app/QueEs'
 import { Vacio, Cargando } from '../../app/EmptyState'
 import { fmtDate } from '../../lib/format'
 import { hasSupabase, supabase } from '../../lib/supabase'
@@ -41,15 +41,14 @@ export function ControlInventario() {
   const [tab, setTab] = useState<Tab>('disp')
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <PageHead title="Control de inventario">
-        Decide el destino de las devoluciones, concilia existencias contra el kardex y revisa las bajas que registró Almacén.
-      </PageHead>
+      <QueEs id="control_inventario" sinPartes />
       {!hasSupabase && <div className="sysnote"><span>Disponible con el sistema conectado.</span></div>}
       <div className="seg" style={{ alignSelf: 'flex-start' }}>
         <button type="button" className={tab === 'disp' ? 'active' : undefined} onClick={() => setTab('disp')}>Devoluciones por disponer</button>
         <button type="button" className={tab === 'conc' ? 'active' : undefined} onClick={() => setTab('conc')}>Conciliación</button>
         <button type="button" className={tab === 'bajas' ? 'active' : undefined} onClick={() => setTab('bajas')}>Bajas de almacén</button>
       </div>
+      <QueEsParte id="control_inventario" parte={tab === 'disp' ? 'Devoluciones por disponer' : tab === 'conc' ? 'Conciliación' : 'Bajas de almacén'} />
       {tab === 'disp' && <Disposicion />}
       {tab === 'conc' && <Conciliacion />}
       {tab === 'bajas' && <Bajas />}
@@ -134,7 +133,7 @@ function Conciliacion() {
   return (
     <div className="card">
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div className="eyebrow" style={{ margin: 0 }}>Conciliación lote ↔ kardex</div>
+        <div className="eyebrow" style={{ margin: 0 }}>¿Las existencias cuadran con sus entradas y salidas?</div>
         <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} disabled={busy || !hasSupabase} onClick={() => void correr()}>{busy ? 'Conciliando…' : 'Conciliar ahora'}</button>
       </div>
       {err && <div className="sysnote" role="alert" style={{ background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)', marginTop: 10 }}><span>{err}</span></div>}
@@ -142,7 +141,7 @@ function Conciliacion() {
         <div style={{ marginTop: 12 }}>
           <div className="sysnote" style={errores.length ? { background: 'var(--danger-bg)', color: 'var(--danger)' } : undefined}>
             <Icon name={errores.length ? 'x' : 'check'} />
-            <span>{errores.length === 0 ? '0 diferencias: la existencia de cada lote cuadra con su kardex.' : `${errores.length} ${errores.length === 1 ? 'diferencia' : 'diferencias'} de inventario. Revísalas antes de operar.`}</span>
+            <span>{errores.length === 0 ? '0 diferencias: la existencia de cada lote cuadra con sus entradas y salidas.' : `${errores.length} ${errores.length === 1 ? 'diferencia' : 'diferencias'} de inventario. Revísalas antes de operar.`}</span>
           </div>
           {[...errores, ...otros].length > 0 && (
             <table className="tbl-cards" style={{ marginTop: 10 }}>

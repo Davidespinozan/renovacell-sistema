@@ -32,6 +32,7 @@ import { downloadCfdi } from '../../data/ops/cfdiDownload'
 import { sendCfdi, emailValido } from '../../data/ops/cfdiSend'
 import { enlacesFactura, textoFacturaWhatsApp, type EnlaceFactura } from '../../data/ops/autofactura'
 import { whatsappCon } from '../../data/ops/busqueda'
+import { QueEs } from '../../app/QueEs'
 import { cancelCfdi, refreshCancelStatus, type MotivoCancel } from '../../data/ops/cfdiCancel'
 
 import { usePaymentClaims, useOrderMoney } from '../../data/hooks/useMoney'
@@ -144,7 +145,7 @@ export function Facturacion() {
   const selectedOrder = orders.find((o) => o.id === selected) ?? null
 
   if (orders.length === 0) {
-    return <Vacio icono="receipt" titulo="Aún no hay ventas que facturar." pista="Las ventas con factura solicitada aparecerán aquí." />
+    return <div className="grid" style={{ gap: 16 }}><QueEs id="facturacion" /><Vacio icono="receipt" titulo="Aún no hay ventas que facturar." pista="Las ventas con factura solicitada aparecerán aquí." /></div>
   }
 
   const CHIPS: { k: Filter; label: string }[] = [
@@ -158,6 +159,7 @@ export function Facturacion() {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="eyebrow crumb">Administración · Facturación</div>
+      <QueEs id="facturacion" />
 
       {/* KPIs */}
       {/* RESUMEN (27 nov 2026): lo que pide acción en grande —por emitir, emitidos, por cobrar— y lo demás en una línea,

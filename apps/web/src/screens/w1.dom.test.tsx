@@ -22,9 +22,10 @@ describe('<Devoluciones> (Almacén)', () => {
 describe('<ControlInventario> (Dirección)', () => {
   it('muestra disposición, conciliación y bajas de almacén', () => {
     renderWithRole(<ControlInventario />)
-    expect(screen.getByText('Control de inventario')).toBeInTheDocument()
+    expect(screen.getByTestId('quees-control_inventario')).toHaveTextContent('Control de inventario.')   // la pantalla se explica sola (27 nov)
     fireEvent.click(screen.getByRole('button', { name: 'Conciliación' }))
-    expect(screen.getByText(/Conciliación lote ↔ kardex/)).toBeInTheDocument()
+    expect(screen.getByText(/¿Las existencias cuadran con sus entradas y salidas\?/)).toBeInTheDocument()   // ya sin «kardex»
+    expect(screen.getByTestId('quees-parte')).toHaveTextContent('Conciliación: El sistema suma las entradas y salidas')
     fireEvent.click(screen.getByRole('button', { name: 'Bajas de almacén' }))
     expect(screen.getByText(/Bajas de almacén · últimos 30 días/)).toBeInTheDocument()
   })

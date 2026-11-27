@@ -6,6 +6,7 @@ import React, { useMemo, useState } from 'react'
 import { TriangleAlert, PackageCheck } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
 import { ExportButton } from '../../app/ExportButton'
+import { QueEs } from '../../app/QueEs'
 import { useInventory } from '../../data/hooks/useInventory'
 import { useLots } from '../../data/hooks/useLots'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -57,6 +58,7 @@ export function Mermas() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
+      <QueEs id="mermas" />
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <TriangleAlert size={18} />
         <div className="eyebrow crumb" style={{ margin: 0 }}>Dirección · Mermas valuadas</div>

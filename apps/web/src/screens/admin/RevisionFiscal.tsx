@@ -16,7 +16,7 @@
 //     el comando puede negarse y aquí solo se traduce su respuesta.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, BadgeCheck, Check, FileSearch, Info, Layers, Lock, Pencil, Search, Unlink, X } from 'lucide-react'
-import { PageHead } from '../../app/PageHead'
+import { QueEs, QueEsParte } from '../../app/QueEs'
 import { EnvioFiscal } from './EnvioFiscal'   // BLOQUE1 · concepto «Envío» de la factura
 import { ExportButton } from '../../app/ExportButton'
 import { ConfirmModal } from '../../app/ConfirmModal'
@@ -62,22 +62,19 @@ export function RevisionFiscal() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <PageHead title="Revisión fiscal del catálogo">
-        Cada producto necesita su dato fiscal <b>revisado y validado por una persona</b> antes de poder
-        facturarse. Un producto sin validar no se factura: el sistema rechaza la factura completa en
-        lugar de inventar un valor.
-      </PageHead>
+      <QueEs id="revision_fiscal" sinPartes />
 
       <Avance a={avance} loading={loading} />
 
       <div className="seg" style={{ alignSelf: 'flex-start' }}>
         {([['productos', `Productos (${avance.total})`],
-           ['categorias', `Candidatos por categoría (${defaults.length})`],
-           ['huerfanas', `Evidencia sin producto (${huerfanas.length})`],
+           ['categorias', `Sugerencias por categoría (${defaults.length})`],
+           ['huerfanas', `Histórico sin producto (${huerfanas.length})`],
            ['envio', 'Envío']] as const).map(([k, lbl]) => (
           <button key={k} type="button" className={tab === k ? 'active' : undefined} onClick={() => setTab(k)}>{lbl}</button>
         ))}
       </div>
+      <QueEsParte id="revision_fiscal" parte={tab === 'productos' ? 'Productos' : tab === 'categorias' ? 'Sugerencias por categoría' : tab === 'huerfanas' ? 'Histórico sin producto' : 'Envío'} />
 
       {tab === 'productos' && <TabProductos filas={data} categorias={categorias} loading={loading} reload={reload} />}
       {tab === 'categorias' && <TabCategorias defaults={defaults} categorias={categorias} reload={reload} />}
@@ -381,8 +378,8 @@ function DetalleProducto({ f, onClose, reload }: { f: FilaRevisionFiscal; onClos
       {/* ---------- 1. VERDAD COMERCIAL ---------- */}
       <section style={{ ...BLOQUE, background: '#F4F6F3', borderLeft: '3px solid var(--ink-3)' }}>
         <div className="eyebrow" style={{ marginTop: 0 }}>
-          <Lock size={12} /> 1 · Verdad comercial
-          <span style={{ fontWeight: 400, textTransform: 'none' }}> — solo lectura, no se edita aquí</span>
+          <Lock size={12} /> 1 · Cómo se vende
+          <span style={{ fontWeight: 400, textTransform: 'none' }}> — solo consulta, aquí no se cambia</span>
         </div>
         <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', fontSize: 13 }}>
           <Dato k="Categoría" v={f.categoria ?? '—'} />
@@ -403,8 +400,8 @@ function DetalleProducto({ f, onClose, reload }: { f: FilaRevisionFiscal; onClos
       {/* ---------- 2. BORRADOR FISCAL ---------- */}
       <section style={{ ...BLOQUE, backgroundColor: 'var(--cp-surface)', borderLeft: '3px solid var(--green-deep)' }}>
         <div className="eyebrow" style={{ marginTop: 0 }}>
-          <Pencil size={12} /> 2 · Borrador fiscal
-          <span style={{ fontWeight: 400, textTransform: 'none' }}> — editable, aún SIN autoridad fiscal</span>
+          <Pencil size={12} /> 2 · Datos para la factura
+          <span style={{ fontWeight: 400, textTransform: 'none' }}> — se pueden corregir{f.validado ? '' : '; no cuentan hasta que alguien los valide'}</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 }}>
           <Campo label="Clave de producto/servicio (SAT)" hint="8 dígitos">
@@ -474,7 +471,7 @@ function DetalleProducto({ f, onClose, reload }: { f: FilaRevisionFiscal; onClos
 
       {/* ---------- 3. EVIDENCIA HISTÓRICA ---------- */}
       <section style={{ ...BLOQUE, background: 'var(--warn-bg)', borderLeft: '3px solid var(--warn)' }}>
-        <div className="eyebrow" style={{ marginTop: 0 }}>3 · Evidencia histórica comercial</div>
+        <div className="eyebrow" style={{ marginTop: 0 }}>3 · Precios del histórico <span style={{ fontWeight: 400, textTransform: 'none' }}>— solo referencia</span></div>
         {/* El aviso que impide el malentendido más caro de esta pantalla: va en
             grande, no escondido en un encabezado pequeño. */}
         <p style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: 'var(--warn)', display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -497,7 +494,7 @@ function DetalleProducto({ f, onClose, reload }: { f: FilaRevisionFiscal; onClos
 
       {/* ---------- VALIDACIÓN ---------- */}
       <section style={{ marginTop: 22, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
-        <div className="eyebrow"><BadgeCheck size={13} /> Validación fiscal</div>
+        <div className="eyebrow"><BadgeCheck size={13} /> 4 · Validar <span style={{ fontWeight: 400, textTransform: 'none' }}>— tu confirmación de que los datos están bien</span></div>
         {f.validado ? (
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <Campo label="Motivo para retirar la validación" hint="obligatorio">
@@ -631,7 +628,7 @@ function TabCategorias({ defaults, categorias, reload }: {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="card" style={{ padding: 16 }}>
-        <div className="eyebrow" style={{ marginTop: 0 }}><Layers size={13} /> Candidatos por categoría</div>
+        <div className="eyebrow" style={{ marginTop: 0 }}><Layers size={13} /> Sugerencias por categoría</div>
         <p style={{ margin: 0, fontSize: 13 }}>
           Son <b>propuestas</b> para no teclear lo mismo muchas veces. Aplicarlas solo rellena los huecos de
           los productos <b>no validados</b>: nunca pisa un valor ya capturado, nunca toca un producto validado
@@ -709,7 +706,7 @@ function DefinirCandidatos({ categorias, onDone }: { categorias: string[]; onDon
 
   return (
     <div className="card" style={{ padding: 16 }}>
-      <div className="eyebrow" style={{ marginTop: 0 }}>Definir candidatos de una categoría</div>
+      <div className="eyebrow" style={{ marginTop: 0 }}>Definir la sugerencia de una categoría</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
         <Campo label="Categoría">
           <select value={cat} onChange={(e) => setCat(e.target.value)} style={INP}>
@@ -757,7 +754,7 @@ function TabHuerfanas({ filas }: { filas: ObservacionEvidencia[] }) {
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="card" style={{ padding: 16 }}>
-        <div className="eyebrow" style={{ marginTop: 0 }}><Unlink size={13} /> Observaciones históricas sin producto · solo lectura</div>
+        <div className="eyebrow" style={{ marginTop: 0 }}><Unlink size={13} /> Histórico sin producto · solo consulta</div>
         <p style={{ margin: 0, fontSize: 13 }}>
           Filas de la conciliación histórica que <b>no se pudieron asociar a un producto del catálogo con
           certeza</b>. Se conservan como evidencia; no se adivinó a qué producto pertenecen.

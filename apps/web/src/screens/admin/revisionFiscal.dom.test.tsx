@@ -292,7 +292,7 @@ describe('T13 · cambiar un dato material de un producto validado avisa y reflej
 describe('T15/T16 · los candidatos por categoría son propuesta, no autoridad', () => {
   it('T15 — aplicar la propuesta pre-llena y reporta explícitamente 0 validados', async () => {
     render(<RevisionFiscal />)
-    fireEvent.click(await screen.findByText(/Candidatos por categoría/))
+    fireEvent.click(await screen.findByRole('button', { name: /Sugerencias por categoría \(/ }))
     fireEvent.click(await screen.findByText('Aplicar propuesta'))
     expect(await screen.findByText(/No se validará ningún producto/)).toBeInTheDocument()
     fireEvent.click(screen.getByText('Aplicar propuesta', { selector: '.modal button' }))
@@ -302,7 +302,7 @@ describe('T15/T16 · los candidatos por categoría son propuesta, no autoridad',
 
   it('T16 — la pantalla declara que no pisa valores ni toca productos validados', async () => {
     render(<RevisionFiscal />)
-    fireEvent.click(await screen.findByText(/Candidatos por categoría/))
+    fireEvent.click(await screen.findByRole('button', { name: /Sugerencias por categoría \(/ }))
     expect(await screen.findByText(/nunca pisa un valor ya capturado/)).toBeInTheDocument()
     expect(screen.getByText(/nunca toca un producto validado/)).toBeInTheDocument()
     expect(screen.getByText(/nunca valida nada/)).toBeInTheDocument()
@@ -310,7 +310,7 @@ describe('T15/T16 · los candidatos por categoría son propuesta, no autoridad',
 
   it('T17b — no hay ningún control que valide la categoría completa', async () => {
     render(<RevisionFiscal />)
-    fireEvent.click(await screen.findByText(/Candidatos por categoría/))
+    fireEvent.click(await screen.findByRole('button', { name: /Sugerencias por categoría \(/ }))
     await screen.findByText('Aplicar propuesta')
     expect(screen.queryByText(/Validar categoría|Validar todos|Aprobar categoría/i)).toBeNull()
   })
@@ -320,7 +320,7 @@ describe('T15/T16 · los candidatos por categoría son propuesta, no autoridad',
 describe('T20/T21 · las 12 observaciones sin producto', () => {
   it('T20 — se representan todas, con su motivo', async () => {
     render(<RevisionFiscal />)
-    fireEvent.click(await screen.findByText(/Evidencia sin producto \(12\)/))
+    fireEvent.click(await screen.findByText(/Histórico sin producto \(12\)/))
     expect(await screen.findByText('Histórico sin producto 0')).toBeInTheDocument()
     expect(screen.getByText('Histórico sin producto 11')).toBeInTheDocument()
     expect(screen.getByText('nombre ambiguo entre dos productos')).toBeInTheDocument()
@@ -329,7 +329,7 @@ describe('T20/T21 · las 12 observaciones sin producto', () => {
 
   it('T21 — desde ahí no se crea ni se asocia nada: la sección es de solo lectura', async () => {
     render(<RevisionFiscal />)
-    fireEvent.click(await screen.findByText(/Evidencia sin producto \(12\)/))
+    fireEvent.click(await screen.findByText(/Histórico sin producto \(12\)/))
     await screen.findByText('Histórico sin producto 0')
     // Ningún CONTROL ofrece crear ni asociar. (La prosa sí usa esas palabras: para negarlas.)
     const controles = [...screen.getAllByRole('button'), ...screen.queryAllByRole('link')]

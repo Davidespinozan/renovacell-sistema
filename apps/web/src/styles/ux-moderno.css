@@ -417,6 +417,31 @@ button.cifra-v{cursor:pointer}
 /* BLOQUE1 · efectivo que trae el chofer: resalta si hay que entregarlo */
 .mi-efectivo-pend { border-left: 4px solid var(--ds-warning); }
 
+/* QUÉ ES ESTA PANTALLA · una frase siempre a la vista + el detalle que se oculta (app/QueEs.tsx) */
+.quees { border: 1px solid var(--line); border-radius: var(--r-ui, 14px); background: var(--st-neu-bg); padding: 12px 14px; display: grid; gap: 10px; min-width: 0; }
+.quees-cab { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 10px; }
+.quees-ico { width: 17px; height: 17px; margin-top: 2px; color: var(--ux-ink-3, var(--ink-3)); }
+.quees-que { margin: 0; max-width: 112ch; font-size: var(--fs-sm, 13.5px); line-height: 1.5; color: var(--ux-ink-2, var(--ink-2)); }
+.quees-que b { color: var(--ink); font-weight: 600; }
+.quees-alternar { border: 0; background: none; padding: 2px 0; font: 600 var(--fs-sm, 13px)/1.4 inherit; font-family: inherit; color: var(--green-deep); cursor: pointer; white-space: nowrap; min-height: 28px; }
+.quees-alternar:hover { text-decoration: underline; }
+.quees-cuerpo { display: grid; gap: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.quees-bloques { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px 36px; }
+.quees-bloques:empty { display: none; }
+.quees-bloque { min-width: 0; }
+.quees-bloque h3 { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ux-ink-3, var(--ink-3)); }
+.quees-bloque ol { margin: 0; padding-left: 18px; display: grid; gap: 5px; font-size: var(--fs-sm, 13.5px); line-height: 1.5; color: var(--ink); }
+.quees-bloque dl { margin: 0; display: grid; gap: 5px; font-size: var(--fs-sm, 13.5px); line-height: 1.5; }
+.quees-bloque dt { display: inline; font-weight: 600; color: var(--ink); }
+.quees-bloque dd { display: inline; margin: 0; color: var(--ux-ink-2, var(--ink-2)); }
+.quees-nota { margin: 0; max-width: 112ch; font-size: var(--fs-sm, 13.5px); line-height: 1.5; color: var(--ux-ink-2, var(--ink-2)); }
+.quees-nota b { color: var(--ink); font-weight: 600; }
+.quees-parte { margin: -6px 0 0; max-width: 90ch; font-size: var(--fs-sm, 13.5px); line-height: 1.5; color: var(--ux-ink-2, var(--ink-2)); }
+.quees-parte b { color: var(--ink); font-weight: 600; }
+@media (max-width: 640px) {
+  .quees-cab { grid-template-columns: auto minmax(0, 1fr); }
+  .quees-alternar { grid-column: 2; justify-self: start; }
+}
 /* SEGUIMIENTO · filtros: por dónde viaja (arriba) y en qué va (abajo) */
 .seg-filtros { display: grid; gap: 8px; }
 /* BLOQUE1 · incidencia: reintentar / cambiar chofer / regresó al almacén */

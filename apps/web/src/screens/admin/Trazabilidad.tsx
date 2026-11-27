@@ -6,7 +6,7 @@
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../app/icons'
 import { money, fmtDate } from '../../lib/format'
-import { PageHead } from '../../app/PageHead'
+import { QueEs, QueEsParte } from '../../app/QueEs'
 import { ExportButton } from '../../app/ExportButton'
 import { useInventory } from '../../data/hooks/useInventory'
 import { useLots } from '../../data/hooks/useLots'
@@ -68,10 +68,7 @@ export function Trazabilidad() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <PageHead title="Trazabilidad">
-        Para responder al instante: si un <b>lote</b> sale con problema, <b>a qué clientes llegó</b> (para
-        avisarles); y con qué lotes se surtió un <b>pedido</b>. Es tu respaldo ante COFEPRIS y para un recall.
-      </PageHead>
+      <QueEs id="trazabilidad" sinPartes />
 
       <div className="seg" style={{ alignSelf: 'flex-start' }}>
         <button type="button" className={mode === 'lote' ? 'active' : undefined} onClick={() => setMode('lote')}>
@@ -81,6 +78,7 @@ export function Trazabilidad() {
           <Icon name="bag" /> Revisar un pedido
         </button>
       </div>
+      <QueEsParte id="trazabilidad" parte={mode === 'lote' ? 'Seguir un lote' : 'Revisar un pedido'} />
 
       {mode === 'lote'
         ? <PorLote lots={lots} movements={movements} prodName={prodName} orders={orders} orderByRef={orderByRef} clientName={clientName} />
