@@ -22,6 +22,7 @@ import { statusView } from '../doctor/orderStatus'
 import type { ProductSafe } from '../../data/types'
 import { cantidadVista, esMediaCaja } from '../../lib/cajas'
 import { clienteDePedido } from '../../data/mock/profiles'   // el nombre del cliente junto al folio (Almacén lo pidió)
+import { EntregaPill, ordenarPorSalida } from '../packing/Cola'   // HORA DE SALIDA (26 nov 2026): cuándo sale cada pedido, lo primero arriba
 // SOBRE PEDIDO (26 nov 2026): el pedido se vendió sin existencia y espera mercancía.
 const esSobrePedido = (o: { shipping_meta?: unknown }) => (((o.shipping_meta as { sobre_pedido?: unknown[] } | null)?.sobre_pedido) ?? []).length > 0
 
@@ -41,7 +42,7 @@ export function Surtido() {
     return m
   }, [products])
 
-  const pending = orders.filter((o) => isSurtible(o, byOrder[o.id]))
+  const pending = ordenarPorSalida(orders.filter((o) => isSurtible(o, byOrder[o.id])))
   // SALIDA PROGRAMADA · pagados que salen después de mañana: aún no se preparan (aparecen aquí un día antes).
   const manana = sumarDias(hoyNegocio(), 1)
   const programados = orders.filter((o) => (byOrder[o.id]?.liberado ?? o.payment_status === 'paid') && !['packed', 'shipped', 'delivered', 'fulfilled', 'cancelled'].includes(o.status ?? '')
@@ -164,6 +165,7 @@ export function Surtido() {
                   {canDo && esSobrePedido(o) && <span className="pill p-ok" data-testid="surtido-ya-llego">Sobre pedido · ya llegó, se puede surtir</span>}
                   <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(o.created_at)}</span>
                 </div>
+                <EntregaPill e={entregaDelPedido(o.shipping_meta)} />
                 {o.items.map((it) => (
                   <div key={it.id} className="coitem">
                     <span>

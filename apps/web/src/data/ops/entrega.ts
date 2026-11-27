@@ -399,3 +399,28 @@ export async function guardarEntregaPreferida(customerId: string, opcion: string
   const { error } = await (supabase.rpc as unknown as RpcPref)('cliente_entrega_preferida_guardar', { p_customer: customerId, p_opcion: opcion })
   return error ? { ok: false, error: 'No se pudo guardar la preferencia de entrega del cliente.' } : { ok: true }
 }
+
+// ═══ HORA DE SALIDA (26 nov 2026, dueño: «los pedidos deberían mostrar a qué hora salen»). Almacén veía el DÍA de salida
+// en «Por enviar» e Inicio, pero no la hora, y en «Preparar» ni eso. La hora sale de lo que ya se le prometió al cliente:
+// la entrega local trae su horario reservado (sale ANTES de que empiece) y la paquetería sale antes de la hora de corte
+// de la regla de entrega. Recoger en sucursal no tiene hora. Nada se inventa.
+export const CORTE_POR_DEFECTO = '15:30'
+/** «11:00» → «11:00 a.m.», «15:30» → «3:30 p.m.». */
+export function hora12(hhmm: string | null | undefined): string {
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm ?? ''); if (!m) return ''
+  const h = Number(m[1]); const pm = h >= 12
+  return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${pm ? 'p.m.' : 'a.m.'}`
+}
+export interface SalidaPedido { etiqueta: string; hora: string | null; cuando: 'atrasado' | 'hoy' | 'despues'; orden: string }
+export function salidaDePedido(e: Pick<EntregaPedido, 'tipo' | 'salida'> & Partial<Pick<EntregaPedido, 'horario' | 'paqueteria'>> | null | undefined, hoy: string, corte: string = CORTE_POR_DEFECTO): SalidaPedido | null {
+  if (!e || !e.salida || e.tipo === 'mostrador') return null
+  const h = e.horario ?? null
+  const dia = (h?.fecha || e.salida).slice(0, 10)
+  const hora = e.tipo === 'local' ? (h?.inicio ?? null) : e.tipo === 'foraneo' ? corte : null
+  const cuando: SalidaPedido['cuando'] = dia < hoy ? 'atrasado' : dia === hoy ? 'hoy' : 'despues'
+  const ddmm = `${dia.slice(8, 10)}/${dia.slice(5, 7)}`
+  const conHora = hora ? ` antes de las ${hora12(hora)}` : ''
+  const verbo = e.tipo === 'recoge' ? ['Debieron recogerlo el', 'Lo recogen hoy', 'Lo recogen el'] : ['Debió salir el', 'Sale hoy', 'Sale el']
+  const etiqueta = cuando === 'atrasado' ? `${verbo[0]} ${ddmm}${conHora}` : cuando === 'hoy' ? `${verbo[1]}${conHora}` : `${verbo[2]} ${ddmm}${conHora}`
+  return { etiqueta, hora, cuando, orden: `${dia}T${hora ?? '23:59'}` }
+}

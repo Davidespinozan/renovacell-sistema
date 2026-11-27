@@ -31,7 +31,8 @@ import { useRole, useRoleOpcional } from '../../auth/RoleContext'
 import { CancelOrderModal } from '../../app/CancelOrderModal'
 import { AvisoCancelacion, SolicitarCancelacion } from '../../app/Cancelacion'
 import { solicitudDe, useSolicitudesCancelacion } from '../../data/ops/cancelacionSolicitud'
-import { NOMBRE_PAQUETERIA, estimadaDe, promesaDe, resumenPaqueteria, type EntregaPedido } from '../../data/ops/entrega'
+import { NOMBRE_PAQUETERIA, estimadaDe, promesaDe, resumenPaqueteria, salidaDePedido, type EntregaPedido } from '../../data/ops/entrega'
+import { useCorteEntrega } from '../../data/hooks/useCorteEntrega'
 import { sinServiciosExcluidos } from '../../../../../supabase/functions/_shared/cotizarEnvio'   // PAQ-SIMPLE · la MISMA lista de servicios prohibidos que el servidor
 import { PAQ_MANUALES, esPaqManual, registrarGuiaManual, urlRastreoEstafeta, validarCostoGuia, validarGuiaManual, type PaqManual } from '../../data/shipping/estafeta'
 import { listarEmpaques, medidasTexto, type Empaque } from '../../data/ops/empaques'
@@ -55,8 +56,10 @@ export function entregaDe(order: OrderWithItems): EntregaPedido | null {
   return m?.entrega ?? null
 }
 export function ordenarPorSalida<T extends OrderWithItems>(lista: T[]): T[] {
+  // HORA DE SALIDA (26 nov 2026): dentro del mismo día, primero lo que sale más temprano (horario del chofer / corte).
+  const clave = (o: T) => salidaDePedido(entregaDe(o), '0000-00-00')?.orden ?? '9999-12-31T23:59'
   return [...lista].sort((a, b) => {
-    const ea = entregaDe(a)?.salida ?? '9999-12-31', eb = entregaDe(b)?.salida ?? '9999-12-31'
+    const ea = clave(a), eb = clave(b)
     return ea < eb ? -1 : ea > eb ? 1 : (a.created_at ?? '') < (b.created_at ?? '') ? -1 : 1
   })
 }
@@ -69,10 +72,12 @@ const hoyLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Maz
 export function EntregaPill({ e }: { e: EntregaPedido | null }) {
   if (!e) return null
   const hoy = hoyLocal()
-  const atrasado = e.salida < hoy
+  const corte = useCorteEntrega()
+  // HORA DE SALIDA (26 nov 2026): el día Y la hora (horario reservado del chofer o corte de paquetería).
+  const s = salidaDePedido(e, hoy, corte)
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '0 0 10px', fontSize: 12.5 }} data-testid="cola-entrega">
-      <span className={'pill ' + (atrasado ? 'p-dang' : e.salida === hoy ? 'p-warn' : 'p-neu')}>{atrasado ? 'Debió salir el ' + e.salida.slice(8, 10) + '/' + e.salida.slice(5, 7) : e.salida === hoy ? 'Sale hoy' : 'Sale ' + e.salida.slice(8, 10) + '/' + e.salida.slice(5, 7)}</span>
+      {s && <span className={'pill ' + (s.cuando === 'atrasado' ? 'p-dang' : s.cuando === 'hoy' ? 'p-warn' : 'p-neu')} data-testid="pedido-salida">{s.etiqueta}</span>}
       <b>{e.tipo === 'foraneo' && e.paqueteria ? NOMBRE_PAQUETERIA[e.paqueteria] ?? e.texto : e.texto}</b>
       <span style={{ color: 'var(--ink-3)' }}>· {promesaDe(e, hoy)}{e.flete ? ` · flete ${money(e.flete)}` : ''}</span>
     </div>
