@@ -111,6 +111,8 @@ export interface Order {
   invoice_requested: boolean
   invoice_meta: Json
   shipping_meta: Json
+  /** Flete cobrado (principal + envíos extra). Viene en ORDER_COLS; opcional porque los datos de prueba no lo traen. */
+  shipping_cost?: number | null
   created_at: ISODateTime
 }
 

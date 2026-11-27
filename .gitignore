@@ -1,5 +1,6 @@
 # Dependencies
-node_modules/
+# sin "/": también cubre un enlace (en Mac apps/web/node_modules era un symlink y se subió al repo)
+node_modules
 
 # Build output
 dist/

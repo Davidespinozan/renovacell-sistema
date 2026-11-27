@@ -18,6 +18,8 @@ export function pedirAvisos(m: MotivoAvisos) {
 }
 export function cerrarPuertaAvisos() { if (abierta) { abierta = null; emitir() } }
 export const puertaAbierta = (): MotivoAvisos | null => abierta
+/** ¿La pantalla ya pidió los avisos por este motivo en esta sesión? (El recordatorio de Inicio no repite la pregunta.) */
+export const puertaYaPidio = (m: MotivoAvisos): boolean => yaPedido(m)
 export function usePuertaAvisos(): MotivoAvisos | null {
   return useSyncExternalStore((cb) => { oyentes.add(cb); return () => { oyentes.delete(cb) } }, puertaAbierta, puertaAbierta)
 }

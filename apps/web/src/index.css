@@ -12,6 +12,7 @@
 @import './styles/calidad.css';
 @import './styles/ds.css';   /* SISTEMA DE DISEÑO · tokens únicos (15 nov 2026) */
 @import './styles/ux-moderno.css';   /* UX MODERNO · Fase 0 (15 nov 2026): capa final, se puede quitar de un golpe */
+@import './styles/tactil.css';   /* CAPA TÁCTIL (27 nov 2026): iPad y tablets; solo pantallas táctiles, se quita de un golpe */
 
 @tailwind base;
 @tailwind components;

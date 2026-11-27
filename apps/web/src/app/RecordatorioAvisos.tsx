@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from 'react'
 import { Bell, X } from 'lucide-react'
 import { activarAvisos as activarPorDefecto, estadoAvisos as estadoPorDefecto, type EstadoAvisos } from '../data/ops/push'
+import { puertaYaPidio, usePuertaAvisos } from '../data/store/puertaAvisos'
 
 const CLAVE = 'rc_recordatorio_avisos_hasta'
 const pospuesto = (): boolean => { try { return Number(localStorage.getItem(CLAVE) ?? 0) > Date.now() } catch { return false } }
@@ -14,7 +15,10 @@ export function RecordatorioAvisos({ estado = estadoPorDefecto, activar = activa
   const [oculto, setOculto] = useState(pospuesto)
   const [msg, setMsg] = useState<string | null>(null); const [ocupado, setOcupado] = useState(false)
   useEffect(() => { void estado().then(setE) }, [estado])
-  if (oculto || !e || e === 'activo' || e === 'no_soportado') return null
+  // TACTIL (27 nov 2026) · la pantalla «Activa las notificaciones» ya lo preguntó al entrar en esta sesión: no se repite
+  // aquí (salían las dos, una encima de la otra). Si esa pantalla no llegó a abrirse, este recordatorio queda de respaldo.
+  usePuertaAvisos()
+  if (oculto || !e || e === 'activo' || e === 'no_soportado' || puertaYaPidio('entrada')) return null
   const tocar = async () => {
     if (ocupado) return
     setOcupado(true); setMsg(null)

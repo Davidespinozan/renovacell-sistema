@@ -111,7 +111,7 @@ export function SelectorClienteVentas({ onPick, onClose, buscador, cartera = car
           <div style={titulo}>Buscar otra cuenta</div>
           <form onSubmit={enviar} style={{ display: 'flex', gap: 8 }} data-testid="sc-form">
             <input value={texto} onChange={(e) => setTexto(e.target.value)} aria-label="Buscar cliente" maxLength={80}
-              placeholder="Nombre (3 letras o más) o últimos 4 dígitos del teléfono"
+              placeholder="Nombre o últimos 4 del teléfono"
               style={{ flex: 1, minWidth: 0, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 16, outline: 'none' }} />
             <button className="btn" type="submit" disabled={busqueda.fase === 'buscando'} data-testid="sc-buscar">Buscar</button>
           </form>
