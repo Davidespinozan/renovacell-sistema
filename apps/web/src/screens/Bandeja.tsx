@@ -5,6 +5,7 @@
 // CHV2-B · El constructor de tareas (`useBandeja`) es ÚNICO: Mi bandeja muestra la cola completa e
 // Inicio muestra su subconjunto superior con el MISMO resultado — no pueden contradecirse.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { pedirFiltro } from '../data/store/filtroInicial'
 import { Icon, type IconName } from '../app/icons'
 import { useRole } from '../auth/RoleContext'
 import { getRole, type RoleKey } from '../app/roles'
@@ -33,7 +34,9 @@ import { hoyNegocio } from '../data/periodo'
 
 export type Tone = 'warn' | 'dang' | 'neu'
 // `screen` ausente = aviso informativo sin destino (p. ej. salud del sistema: no hay nada que reparar aquí).
-export interface Task { id: string; icon: IconName; title: string; detail: string; count: number; tone: Tone; screen?: string }
+export interface Task { id: string; icon: IconName; title: string; detail: string; count: number; tone: Tone; screen?: string
+  /** Filtro con el que debe abrir la pantalla de destino (la pantalla lo toma una vez; ver data/store/filtroInicial). */
+  filtro?: string }
 
 const isEmitida = (o: OrderWithItems) => tieneCfdi(o) // reconoce 'emitida' Y 'timbrada' (fuente única)
 const notCancelled = (o: OrderWithItems) => o.status !== 'cancelled'
@@ -84,7 +87,7 @@ function useTareasBase(): Task[] {
       const porEmitir = orders.filter((o) => notCancelled(o) && o.invoice_requested && !isEmitida(o))
       const porCobrar = orders.filter((o) => notCancelled(o) && (byOrder[o.id]?.saldo ?? (o.payment_status === 'paid' ? 0 : o.total ?? 0)) > 0.0001)
 
-      if (cancelaciones.length) t.push({ id: 'cancelaciones', icon: 'receipt', title: 'Solicitudes de cancelación', detail: 'Alguien del equipo pidió cancelar un pedido: apruébalo o recházalo con nota.', count: cancelaciones.length, tone: 'dang', screen: 'av_ventas' })
+      if (cancelaciones.length) t.push({ id: 'cancelaciones', icon: 'receipt', title: 'Solicitudes de cancelación', detail: 'Alguien del equipo pidió cancelar un pedido: apruébalo o recházalo con nota.', count: cancelaciones.length, tone: 'dang', screen: 'av_ventas', filtro: 'todo' })
       // REPARTO-VERIF (dueño, 30 oct): la verificación de doctores ya no es trabajo de Dirección; la hacen los vendedores (su
       // cartera o, sin vendedor, al azar). Dirección la supervisa en Clientes › Doctores si hace falta.
       // Comprobantes DECLARADOS que esperan revisión: todavía no hay dinero registrado.
@@ -92,18 +95,18 @@ function useTareasBase(): Task[] {
       const transferPend = clasificarDeclaraciones(claims, orders).vigentes
       if (transferPend.length) t.push({ id: 'transfer', icon: 'receipt', title: 'Pagos por validar', detail: 'El cliente informó un pago; verifica que cayó y regístralo.', count: transferPend.length, tone: 'warn', screen: 'av_pagos' })
       if (atorados.length) t.push({ id: 'atorados', icon: 'truck', title: 'Envíos atorados', detail: 'Requieren atención en seguimiento.', count: atorados.length, tone: 'dang', screen: 'seguimiento' })
-      if (porEmitir.length) t.push({ id: 'cfdi', icon: 'receipt', title: 'CFDI por emitir', detail: 'Pedidos con factura solicitada.', count: porEmitir.length, tone: 'warn', screen: 'av_fin' })
-      if (porCobrar.length) t.push({ id: 'cobrar', icon: 'receipt', title: 'Por cobrar', detail: 'Cuentas por cobrar (contra pedido / pendiente).', count: porCobrar.length, tone: 'neu', screen: 'av_fin' })
+      if (porEmitir.length) t.push({ id: 'cfdi', icon: 'receipt', title: 'CFDI por emitir', detail: 'Pedidos con factura solicitada.', count: porEmitir.length, tone: 'warn', screen: 'av_fin', filtro: 'por_emitir' })
+      if (porCobrar.length) t.push({ id: 'cobrar', icon: 'receipt', title: 'Por cobrar', detail: 'Cuentas por cobrar (contra pedido / pendiente).', count: porCobrar.length, tone: 'neu', screen: 'av_fin', filtro: 'por_cobrar' })
       if (lotesCriticos.length) t.push({ id: 'caduc', icon: 'clock', title: 'Lotes por caducar', detail: 'Revisa el detalle en el Tablero.', count: lotesCriticos.length, tone: 'warn', screen: 'tablero' })
 
       // ── Dinero que espera una decisión (estado canónico de `v_order_money`) ──
       const dinero = Object.values(byOrder)
       const reembolsos = dinero.filter((m) => m.reembolso_pendiente > 0.0001)
-      if (reembolsos.length) t.push({ id: 'reembolso', icon: 'receipt', title: 'Reembolsos por resolver', detail: 'Pedidos cancelados o devueltos con dinero por regresar al cliente.', count: reembolsos.length, tone: 'dang', screen: 'av_ventas' })
+      if (reembolsos.length) t.push({ id: 'reembolso', icon: 'receipt', title: 'Reembolsos por resolver', detail: 'Pedidos cancelados o devueltos con dinero por regresar al cliente.', count: reembolsos.length, tone: 'dang', screen: 'av_ventas', filtro: 'todo' })
       const vencidos = dinero.filter(creditoVencido)
-      if (vencidos.length) t.push({ id: 'vencido', icon: 'clock', title: 'Crédito vencido', detail: 'Pedidos a crédito cuya fecha de pago ya pasó.', count: vencidos.length, tone: 'dang', screen: 'av_fin' })
+      if (vencidos.length) t.push({ id: 'vencido', icon: 'clock', title: 'Crédito vencido', detail: 'Pedidos a crédito cuya fecha de pago ya pasó.', count: vencidos.length, tone: 'dang', screen: 'av_fin', filtro: 'por_cobrar' })
       const sobrepagos = dinero.filter((m) => m.sobrepago)
-      if (sobrepagos.length) t.push({ id: 'sobrepago', icon: 'receipt', title: 'Pagos de más', detail: 'Se cobró más que el total del pedido: revisa y regresa la diferencia.', count: sobrepagos.length, tone: 'warn', screen: 'av_ventas' })
+      if (sobrepagos.length) t.push({ id: 'sobrepago', icon: 'receipt', title: 'Pagos de más', detail: 'Se cobró más que el total del pedido: revisa y regresa la diferencia.', count: sobrepagos.length, tone: 'warn', screen: 'av_ventas', filtro: 'todo' })
 
       // ── Inventario que espera una decisión de Dirección ──
       const porDisponer = devoluciones.filter((d) => d.lines.some((l) => l.inspection != null && l.disposition == null))
@@ -182,7 +185,7 @@ export function useBandeja(): { tareas: Task[]; fuentes: React.ReactNode; comerc
 export function ListaTareas({ tareas, limite, onGo }: { tareas: Task[]; limite?: number; onGo: (screen: string) => void }) {
   const vista = limite != null ? [...tareas].sort(porUrgencia).slice(0, limite) : tareas
   if (vista.length === 0) return null
-  return <div className="tasklist">{vista.map((task) => (task.screen ? <TaskRow key={task.id} task={task} onGo={() => onGo(task.screen!)} /> : <AvisoRow key={task.id} task={task} />))}</div>
+  return <div className="tasklist">{vista.map((task) => (task.screen ? <TaskRow key={task.id} task={task} onGo={() => { if (task.filtro) pedirFiltro(task.screen!, task.filtro); onGo(task.screen!) }} /> : <AvisoRow key={task.id} task={task} />))}</div>
 }
 
 export function Bandeja() {

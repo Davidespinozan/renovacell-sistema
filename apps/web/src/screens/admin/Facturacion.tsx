@@ -4,6 +4,7 @@
 // del CFDI (Facturama/PAC) y el cobro por Stripe se conectan en la fase de
 // Supabase; aquí es simulación con la forma final de orders.invoice_meta.
 import { orderClientName } from '../../data/ops/orderClient'
+import { tomarFiltro } from '../../data/store/filtroInicial'
 import { avisar, pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Vacio } from '../../app/EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
@@ -77,7 +78,8 @@ export function Facturacion() {
   const { data: orders } = useAllOrders()
   const { data: products } = useProducts()
   const { data: doctors } = useDoctors()
-  const [filter, setFilter] = useState<Filter>('todos')
+  // Llegada desde un pendiente de Inicio («CFDI por emitir», «Por cobrar»): abre ya con ese filtro.
+  const [filter, setFilter] = useState<Filter>(() => { const f = tomarFiltro('av_fin'); return f === 'por_emitir' || f === 'por_cobrar' ? f : 'todos' })
   const [selected, setSelected] = useState<string | null>(null)
   const { data: claims } = usePaymentClaims()
   const { byOrder } = useOrderMoney()

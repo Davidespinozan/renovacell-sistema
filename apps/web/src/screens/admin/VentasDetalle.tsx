@@ -3,6 +3,7 @@
 // Agrega de useAllOrders + useProducts + useDoctors vía data/metrics. Migrable a
 // un select sobre Supabase sin tocar la pantalla.
 import { orderClientName } from '../../data/ops/orderClient'
+import { tomarFiltro } from '../../data/store/filtroInicial'
 import { capitalizarNombre } from '../../lib/nombres'
 import { avisar, pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Vacio, Cargando, CargandoKpis } from '../../app/EmptyState'
@@ -98,9 +99,12 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
 
   // ABRE EN «HOY» (27 nov 2026): la pregunta de todos los días es «¿qué se vendió hoy?» y contestarla costaba poner la
   // fecha dos veces. Los botones de periodo llenan las fechas; escribir una fecha a mano deja el periodo en «otras fechas».
-  const [periodo, setPeriodo] = useState<PeriodoRapido | 'otro'>('hoy')
-  const [from, setFrom] = useState(() => rangoPeriodo('hoy', hoyNegocio()).from)
-  const [to, setTo] = useState(() => rangoPeriodo('hoy', hoyNegocio()).to)
+  // Llegada desde un pendiente de Inicio (cancelación, reembolso, pago de más): la venta puede ser de otro día, así
+  // que abre en «Todo». Al entrar por el menú abre en «Hoy».
+  const [inicial] = useState<PeriodoRapido>(() => (tomarFiltro('av_ventas') === 'todo' ? 'todo' : 'hoy'))
+  const [periodo, setPeriodo] = useState<PeriodoRapido | 'otro'>(inicial)
+  const [from, setFrom] = useState(() => rangoPeriodo(inicial, hoyNegocio()).from)
+  const [to, setTo] = useState(() => rangoPeriodo(inicial, hoyNegocio()).to)
   const elegirPeriodo = (p: PeriodoRapido) => { const r = rangoPeriodo(p, hoyNegocio()); setPeriodo(p); setFrom(r.from); setTo(r.to) }
   const [channel, setChannel] = useState<ChannelFilter>('todos')
   const [pay, setPay] = useState<PayFilter>('todos')
