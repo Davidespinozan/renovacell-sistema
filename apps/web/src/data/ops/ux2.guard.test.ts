@@ -76,7 +76,9 @@ describe('UX-2 · P2-2 marcar pagado', () => {
     const c = codigo(comprasSrc); const s = codigo(storeSrc)
     expect(c).toMatch(/const puedeComprar = PUEDE_MARCAR_PAGADO\(role\)/)
     expect(c).toMatch(/!o\.paid && puedeComprar && \(/)
-    expect(c).toMatch(/: puedeComprar\n\s+\? <button/)
+    // 27 nov 2026 · el botón de comprar ya sale en TODAS las filas (con stock suficiente o compra en camino también), pero
+    // sigue saliendo solo para quien puede comprar: esa es la condición que se cuida.
+    expect(c).toMatch(/\{puedeComprar\n\s+\? <button/)
     expect(s).toMatch(/export const PUEDE_MARCAR_PAGADO = \(role: string \| null \| undefined\): boolean => role === 'admin' \|\| role === 'billing'/)
     expect(s).toMatch(/\.update\(\{ paid: true \}\)\.eq\('id', id\)\.select\('id'\)/)
     expect(s).toMatch(/if \(!res\.data \|\| res\.data\.length === 0\) \{ void live\.reload\(\); return \{ ok: false/)

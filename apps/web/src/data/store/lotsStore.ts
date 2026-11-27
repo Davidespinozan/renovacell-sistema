@@ -10,7 +10,8 @@ import { costOf } from '../mock/costs'
 import { hasSupabase, supabase } from '../../lib/supabase'
 import { makeLive } from './live'
 import { refreshStock } from './stockStore'
-import { REORDER_THRESHOLD } from '../ops/stock'
+import { nivelDe } from '../ops/stock'
+import { nivelesActuales } from './nivelesStockStore'   // NIVELES POR PRODUCTO (27 nov 2026): el aviso usa el mínimo de cada uno
 import { blendedLotCost } from '../ops/inventoryCost'
 import { runW1Command, newOpId, type W1Result } from '../ops/w1Command'
 import { reloadCompras } from './comprasStore'
@@ -21,7 +22,6 @@ import { diaNegocio, diasEntre, hoyNegocio } from '../periodo'
 // surtir y no dispara alertas. Almacén la captura después con «Corregir».
 export const CADUCIDAD_POR_CAPTURAR = '2099-12-31'
 
-const LOW_STOCK_REORDER = REORDER_THRESHOLD // umbral de reorden único (ver ops/stock)
 
 function sortDesc(m: InventoryMovement[]): InventoryMovement[] {
   return [...m].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
@@ -88,7 +88,8 @@ function flagLowStock(before: Record<string, number>, ids: Set<string>) {
   const names = Object.fromEntries(productsSnapshot().map((p) => [p.id, p.name]))
   ids.forEach((pid) => {
     const b = before[pid] ?? 0, a = after[pid] ?? 0
-    if (b > LOW_STOCK_REORDER && a <= LOW_STOCK_REORDER) {
+    const minimo = nivelDe(nivelesActuales(), pid).minimo   // el del producto si Dirección lo fijó; si no, el general
+    if (b > minimo && a <= minimo) {
       // screen 'compras' (nav de Almacén): antes 'av_inv' (solo nav de Dirección) →
       // el filtro de la campana descartaba el aviso para el almacenista, justo el que
       // debe reabastecer. Dirección lo sigue viendo por el short-circuit admin.
