@@ -153,4 +153,20 @@
 .rc-junta > div{display:grid;gap:2px;min-width:0}
 .rc-junta b{font-size:14px}
 .rc-junta span{font-size:12.5px;color:var(--ink-3)}
+/* Entregar varios al chofer de una vez */
+.hoy-grupo .hoy-lote{margin-left:auto;font-weight:600}
+.elote{display:grid;gap:14px}
+.elote-salida{font-size:13px;color:var(--ds-text-2)}
+.elote-campo{display:grid;gap:6px;font-size:13px;color:var(--ds-text-2)}
+.elote-campo select{min-height:46px;padding:0 12px;border:1px solid var(--ds-border);border-radius:var(--ds-r);background:var(--ds-surface);font:500 var(--ds-fs-md)/1.2 var(--ds-font);color:var(--ds-ink)}
+.elote-falta{font-size:12.5px;font-weight:600;color:var(--warn)}
+.elote-lista{list-style:none;margin:0;padding:0;border:1px solid var(--ds-border);border-radius:var(--ds-r);overflow:hidden}
+.elote-lista li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:10px 12px;border-top:1px solid var(--ds-border);font-size:14px}
+.elote-lista li:first-child{border-top:0}
+.elote-nombre{flex:1 1 180px;min-width:0;font-weight:500;color:var(--ds-ink)}
+.elote-nombre .mono{font-weight:400;font-size:12.5px;color:var(--ds-muted);margin-left:4px}
+.elote-error{flex:1 1 100%;font-size:12.5px;color:var(--danger)}
+.elote-nota{font-size:12.5px;color:var(--ds-muted)}
+.elote-resultado{padding:10px 12px;border-radius:var(--ds-r);background:var(--ok-bg);color:var(--green-deep);font-size:13.5px;font-weight:600}
+.elote-resultado--falla{background:var(--warn-bg);color:var(--warn)}
 .hoy-le-toca{font-size:13px;color:var(--ds-text-2);background:var(--ds-subtle);border-radius:var(--ds-r);padding:10px 12px}

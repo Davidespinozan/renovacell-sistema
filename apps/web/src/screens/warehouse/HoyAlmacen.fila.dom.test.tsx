@@ -5,13 +5,13 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 
-const h = vi.hoisted(() => ({ orders: [] as unknown[], envios: [] as unknown[], dispatch: vi.fn(), shipped: vi.fn(), ancho: true, role: 'warehouse' }))
+const h = vi.hoisted(() => ({ orders: [] as unknown[], envios: [] as unknown[], dispatch: vi.fn(), shipped: vi.fn(), create: vi.fn(), ancho: true, role: 'warehouse' }))
 vi.mock('../../app/useAnchoMinimo', () => ({ useAnchoMinimo: () => h.ancho }))
 vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: h.role, setScreen: vi.fn(), user: { name: 'Alberto', email: 'a@x' } }), useRoleOpcional: () => ({ role: h.role, user: { name: 'Alberto' } }) }))
 vi.mock('../../data/hooks/useOrders', () => ({ useAllOrders: () => ({ data: h.orders }) }))
 vi.mock('../../data/hooks/useMoney', () => ({ useOrderMoney: () => ({ byOrder: {} }) }))
 vi.mock('../../data/hooks/useProducts', () => ({ useProducts: () => ({ data: [{ id: 'p1', name: 'Exosomas' }] }) }))
-vi.mock('../../data/hooks/useShipments', () => ({ useShipments: () => ({ data: h.envios, dispatchShipment: h.dispatch, createShipment: vi.fn() }) }))
+vi.mock('../../data/hooks/useShipments', () => ({ useShipments: () => ({ data: h.envios, dispatchShipment: h.dispatch, createShipment: h.create }) }))
 vi.mock('../logistics/AgendaEntregas', () => ({ useAgendaEntregas: () => ({ data: null, error: null }) }))
 vi.mock('../../data/hooks/useCorteEntrega', () => ({ useCorteEntrega: () => '15:30' }))
 vi.mock('../../data/store/ordersStore', async (orig) => ({ ...(await orig<typeof import('../../data/store/ordersStore')>()), markShipped: h.shipped }))
@@ -24,7 +24,8 @@ const DHL = { opcion: 'foraneo', tipo: 'foraneo', paqueteria: 'dhl', texto: 'DHL
 const LOCAL = { opcion: 'local', tipo: 'local', paqueteria: 'chofer', texto: 'Entrega local', flete: 0, salida: HOY, llega_desde: HOY, llega_hasta: HOY, horario: { fecha: HOY, inicio: '16:00', fin: '18:00' } }
 
 beforeEach(() => {
-  cleanup(); h.dispatch.mockReset(); h.shipped.mockReset(); h.ancho = true; h.role = 'warehouse'
+  cleanup(); h.dispatch.mockReset(); h.shipped.mockReset(); h.create.mockReset(); h.ancho = true; h.role = 'warehouse'
+  try { localStorage.clear() } catch { /* sin almacenamiento */ }
   h.orders = [
     { ...base('o1', 'S1', 'ROCIO UGALDE PEDROZA'), status: 'paid', shipping_meta: meta('ROCIO UGALDE PEDROZA', DHL) },
     { ...base('o2', 'S2', 'Dr. Ruiz'), status: 'packed', shipping_meta: meta('Dr. Ruiz', LOCAL) },
@@ -131,6 +132,64 @@ describe('<HoyAlmacen> · lista y detalle (computadora)', () => {
   it('los números del día siguen ahí, debajo de la fila', () => {
     render(<HoyAlmacen />)
     for (const t of ['hoy-decision', 'hoy-guias', 'hoy-camino']) expect(screen.getByTestId(t)).toBeTruthy()
+  })
+})
+
+describe('<HoyAlmacen> · entregar varios al chofer de una vez', () => {
+  const dosLocales = () => {
+    h.orders = [
+      { ...base('o2', 'S2', 'DR. RUIZ'), status: 'packed', shipping_meta: meta('DR. RUIZ', LOCAL) },
+      { ...base('o6', 'S6', 'Dra. Paz'), status: 'packed', shipping_meta: meta('Dra. Paz', LOCAL) },
+      { ...base('o1', 'S1', 'Dr. Foráneo'), status: 'packed', shipping_meta: meta('Dr. Foráneo', DHL) },
+    ]
+    h.envios = []
+    h.create.mockImplementation(async (x: { order_id: string }) => ({ ok: true, shipment: { id: 'e-' + x.order_id } }))
+    h.dispatch.mockResolvedValue({ ok: true }); h.shipped.mockResolvedValue({ ok: true })
+  }
+  it('con dos locales preparados en la misma salida aparece UN botón; los de paquetería no entran', () => {
+    dosLocales()
+    render(<HoyAlmacen />)
+    const botones = screen.getAllByTestId('hoy-lote')
+    expect(botones).toHaveLength(1)
+    expect(botones[0]).toHaveTextContent('Entregar los 2 al chofer')
+    fireEvent.click(botones[0])
+    const hoja = screen.getByTestId('lote')
+    expect(hoja).toHaveTextContent('Dr. Ruiz'); expect(hoja).toHaveTextContent('Dra. Paz'); expect(hoja).not.toHaveTextContent('Dr. Foráneo')
+  })
+  it('sin chofer elegido el botón dice qué falta; al elegirlo entrega los dos con los tres pasos de siempre', async () => {
+    dosLocales()
+    render(<HoyAlmacen />)
+    fireEvent.click(screen.getByTestId('hoy-lote'))
+    expect(screen.getByTestId('lote-falta')).toHaveTextContent('Falta elegir al chofer')
+    expect((screen.getByTestId('lote-entregar') as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(screen.getByTestId('lote-chofer'), { target: { value: 'drv-1' } })
+    expect(screen.getByTestId('lote-entregar')).toHaveTextContent('Entregar los 2 a Beto')
+    fireEvent.click(screen.getByTestId('lote-entregar'))
+    await waitFor(() => expect(screen.getByTestId('lote-resultado')).toHaveTextContent('Los 2 pedidos ya van En camino con Beto'))
+    expect(h.create).toHaveBeenCalledTimes(2)
+    expect(h.create.mock.calls[0][0]).toMatchObject({ order_id: 'o2', driver_id: 'drv-1', status: 'por_despachar', carrier: null })
+    expect(h.dispatch).toHaveBeenCalledWith('e-o2', 'Alberto', 'S2'); expect(h.dispatch).toHaveBeenCalledWith('e-o6', 'Alberto', 'S6')
+    expect(h.shipped).toHaveBeenCalledWith('o6', { method: 'chofer', driver: 'Beto · Chofer', driver_id: 'drv-1' })
+    expect(localStorage.getItem('rc_ultimo_chofer')).toBe('drv-1')             // la próxima vez ya viene elegido
+    fireEvent.click(screen.getByTestId('lote-listo'))
+    expect(screen.queryByTestId('lote')).toBeNull()
+  })
+  it('si uno falla, dice cuál y por qué; el otro sí sale', async () => {
+    dosLocales()
+    h.dispatch.mockImplementation(async (envio: string) => (envio === 'e-o2' ? { ok: false, error: 'Sin conexión.' } : { ok: true }))
+    render(<HoyAlmacen />)
+    fireEvent.click(screen.getByTestId('hoy-lote'))
+    fireEvent.change(screen.getByTestId('lote-chofer'), { target: { value: 'drv-2' } })
+    fireEvent.click(screen.getByTestId('lote-entregar'))
+    await waitFor(() => expect(screen.getByTestId('lote-resultado')).toHaveTextContent('1 de 2 quedaron En camino'))
+    expect(screen.getByTestId('lote-pedido-o2')).toHaveTextContent('Quedó asignado, pero NO salió. Sin conexión.')
+    expect(screen.getByTestId('lote-pedido-o6')).toHaveTextContent('En camino')
+    expect(h.shipped).toHaveBeenCalledTimes(1)
+  })
+  it('con un solo local preparado no hay botón de lote: se usa el de siempre', () => {
+    dosLocales(); h.orders = (h.orders as Array<{ id: string }>).filter((o) => o.id !== 'o6')
+    render(<HoyAlmacen />)
+    expect(screen.queryByTestId('hoy-lote')).toBeNull()
   })
 })
 

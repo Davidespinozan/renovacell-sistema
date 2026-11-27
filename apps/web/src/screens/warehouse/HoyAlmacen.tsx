@@ -22,6 +22,7 @@ import { markShipped } from '../../data/store/ordersStore'
 import { driverName } from '../../data/mock/shipments'
 import { FilaRecoger, paraRecoger } from '../logistics/ParaRecoger'
 import { SurtirModal } from './Surtido'
+import { EntregarLote } from './EntregarLote'
 import { useAgendaEntregas } from '../logistics/AgendaEntregas'
 import { useRole } from '../../auth/RoleContext'
 import type { ProductSafe, Shipment } from '../../data/types'
@@ -59,6 +60,8 @@ export function HoyAlmacen() {
   const { data: shipments, dispatchShipment } = useShipments()
   const [preparar, setPreparar] = useState<OrderWithItems | null>(null)
   const [enviar, setEnviar] = useState<OrderWithItems | null>(null)
+  // ENTREGAR VARIOS AL CHOFER: los locales ya preparados de una misma salida, de una vez.
+  const [lote, setLote] = useState<{ pedidos: OrderWithItems[]; salida: string } | null>(null)
   const hoy = hoyLocal()
   const { setScreen, user, role } = useRole()
   const corte = useCorteEntrega()
@@ -196,7 +199,11 @@ export function HoyAlmacen() {
           <div className="tasklist hoy-lista" data-testid="hoy-lista">
             {grupos.map((g) => (
               <React.Fragment key={g.titulo + g.items[0].id}>
-                <div className="hoy-grupo" data-testid="hoy-grupo"><Icon name="clock" /> {g.titulo} <span>({g.items.length})</span></div>
+                <div className="hoy-grupo" data-testid="hoy-grupo"><Icon name="clock" /> {g.titulo} <span>({g.items.length})</span>{(() => {
+                  // Los que ya están preparados y se vendieron con chofer, todavía sin asignar. Con dos o más, un solo botón.
+                  const listos = g.items.filter((o) => o.__accion.tipo === 'enviar' && metodoSugerido(entregaDe(o)) === 'chofer')
+                  return listos.length >= 2 ? <button type="button" className="btn sm hoy-lote" onClick={() => setLote({ pedidos: listos, salida: g.titulo })} data-testid="hoy-lote">Entregar los {listos.length} al chofer</button> : null
+                })()}</div>
                 {g.items.map((o) => renglon(o.id, o, pasoDe(o)))}
               </React.Fragment>
             ))}
@@ -234,6 +241,7 @@ export function HoyAlmacen() {
       </div>
       {preparar && <SurtirModal order={preparar} productsById={byId} onClose={() => setPreparar(null)} />}
       {enviar && <AsignarModal order={enviar} onClose={() => setEnviar(null)} />}
+      {lote && <EntregarLote pedidos={lote.pedidos} salida={lote.salida} quien={user?.name ?? 'Almacén'} onCerrar={() => setLote(null)} />}
     </div>
   )
 }
