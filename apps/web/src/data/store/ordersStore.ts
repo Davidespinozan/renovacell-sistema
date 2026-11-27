@@ -545,9 +545,12 @@ export async function setOrderFiscalSnapshot(orderId: string, receiver: FiscalPr
     emit()
   }
   if (hasSupabase && isUuid(orderId)) {
-    const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
-    const { error } = await rpc('set_order_fiscal_snapshot', { p_order_id: orderId, p_receiver: clean })
-    if (error) { void refrescarPedido(orderId); return { ok: false, error: error.message } }
+    // `rpc` LIGADO a su cliente: suelto pierde su «this» y truena (ver customersStore). Y nunca deja la pantalla colgada.
+    const rpc = (supabase.rpc.bind(supabase) as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
+    try {
+      const { error } = await rpc('set_order_fiscal_snapshot', { p_order_id: orderId, p_receiver: clean })
+      if (error) { void refrescarPedido(orderId); return { ok: false, error: error.message } }
+    } catch { void refrescarPedido(orderId); return { ok: false, error: 'No se pudieron guardar los datos fiscales del pedido. Intenta de nuevo.' } }
     void refrescarPedido(orderId)
   }
   return { ok: true }

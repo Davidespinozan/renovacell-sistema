@@ -69,16 +69,22 @@ export function customerFiscal(c: { meta?: unknown } | null | undefined): Fiscal
   return normalizeFiscalProfile(f ?? {})
 }
 
+// OJO (27 nov 2026 · error en vivo: «el pedido con Solicitar factura se queda guardando»): `supabase.rpc` es un MÉTODO.
+// Guardado suelto en una variable (`const rpc = supabase.rpc`) pierde su dueño y, al llamarlo, truena con «Cannot read
+// properties of undefined (reading 'rest')». Así estuvieron cuatro llamadas desde el 25 sep: nunca funcionaron en el
+// navegador real (las pruebas simulan `rpc` con una función suelta y no lo veían). Siempre va LIGADO: `.bind(supabase)`.
 // MASTER fiscal: escribe SOLO customers.meta.fiscal vía RPC acotada (no update directo del row,
 // no amplía RLS). Valida en cliente antes de invocar; el servidor revalida y autoriza.
 export async function upsertCustomerFiscal(customerId: string, fiscal: FiscalProfile): Promise<{ ok: boolean; error?: string }> {
   const v = validateFiscalProfile(fiscal)
   if (!v.ok) return { ok: false, error: Object.values(v.errors)[0] ?? 'Datos fiscales incompletos.' }
   if (!hasSupabase) return { ok: true } // mock: la UI conserva el estado del formulario
-  const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
-  const { error } = await rpc('upsert_customer_fiscal', { p_customer_id: customerId, p_fiscal: normalizeFiscalProfile(fiscal) })
-  if (error) return { ok: false, error: error.message }
-  return { ok: true }
+  const rpc = (supabase.rpc.bind(supabase) as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
+  try {
+    const { error } = await rpc('upsert_customer_fiscal', { p_customer_id: customerId, p_fiscal: normalizeFiscalProfile(fiscal) })
+    if (error) return { ok: false, error: error.message }
+    return { ok: true }
+  } catch { return { ok: false, error: 'No se pudieron guardar los datos fiscales del cliente. Intenta de nuevo.' } }
 }
 
 // RESOLVER CENTRAL (server-side) — devuelve { status, customer_id, signals }. Solo staff puede
@@ -86,23 +92,27 @@ export async function upsertCustomerFiscal(customerId: string, fiscal: FiscalPro
 export interface IdentityResolution { status: 'EXACT' | 'MATCH' | 'NOT_FOUND' | 'AMBIGUOUS'; customer_id: string | null; signals: string[] }
 export async function resolveCustomerIdentity(sig: { profile_id?: string | null; external_id?: string | null; source?: string | null; email?: string | null; phone?: string | null; name?: string | null }): Promise<IdentityResolution | null> {
   if (!hasSupabase) return null
-  const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ data: unknown; error: { message: string } | null }>)
-  const { data, error } = await rpc('resolve_customer_identity', {
-    p_profile_id: sig.profile_id ?? null, p_external_id: sig.external_id ?? null, p_source: sig.source ?? null,
-    p_email: sig.email ?? null, p_phone: sig.phone ?? null, p_name: sig.name ?? null,
-  })
-  if (error) { console.warn('[identity] resolve', error.message); return null }
-  return (data ?? null) as IdentityResolution | null
+  const rpc = (supabase.rpc.bind(supabase) as unknown as (fn: string, args: unknown) => Promise<{ data: unknown; error: { message: string } | null }>)
+  try {
+    const { data, error } = await rpc('resolve_customer_identity', {
+      p_profile_id: sig.profile_id ?? null, p_external_id: sig.external_id ?? null, p_source: sig.source ?? null,
+      p_email: sig.email ?? null, p_phone: sig.phone ?? null, p_name: sig.name ?? null,
+    })
+    if (error) { console.warn('[identity] resolve', error.message); return null }
+    return (data ?? null) as IdentityResolution | null
+  } catch { return null }
 }
 
 // SYNC de contacto acotado (Mi Perfil del doctor / staff). Merge conservador server-side: un valor
 // vacío NUNCA pisa dato bueno. No abre UPDATE general de customers.
 export async function upsertCustomerContact(customerId: string, patch: { full_name?: string; email?: string; phone?: string; city?: string; organization?: string; notes?: string; seller_name?: string }): Promise<{ ok: boolean; error?: string }> {
   if (!hasSupabase) return { ok: true }
-  const rpc = (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
-  const { error } = await rpc('upsert_customer_contact', { p_customer_id: customerId, p_patch: patch })
-  if (error) return { ok: false, error: /CORREO_INVALIDO/.test(error.message) ? 'El correo no es válido.' : /TELEFONO_INVALIDO/.test(error.message) ? 'El teléfono debe tener de 10 a 15 dígitos.' : error.message }
-  return { ok: true }
+  const rpc = (supabase.rpc.bind(supabase) as unknown as (fn: string, args: unknown) => Promise<{ error: { message: string } | null }>)
+  try {
+    const { error } = await rpc('upsert_customer_contact', { p_customer_id: customerId, p_patch: patch })
+    if (error) return { ok: false, error: /CORREO_INVALIDO/.test(error.message) ? 'El correo no es válido.' : /TELEFONO_INVALIDO/.test(error.message) ? 'El teléfono debe tener de 10 a 15 dígitos.' : error.message }
+    return { ok: true }
+  } catch { return { ok: false, error: 'No se pudieron guardar los datos de contacto. Intenta de nuevo.' } }
 }
 
 // Busca un customer existente por identidad (para clasificación de import). Prioridad: (source,
