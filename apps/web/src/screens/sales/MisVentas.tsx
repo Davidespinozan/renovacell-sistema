@@ -3,6 +3,7 @@
 // que el vendedor ya puede ver (RLS = su cartera), sin cancelados ni borradores; "este mes" = mes del negocio;
 // "por cobrar" = sin pagar ni reembolsar. Tocar un pedido muestra sus productos.
 import React, { useMemo, useState } from 'react'
+import { capitalizarNombre } from '../../lib/nombres'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { clienteDePedido } from '../../data/mock/profiles'
@@ -31,6 +32,15 @@ export function filtrarVentas(pedidos: OrderWithItems[], filtro: FiltroVentas, m
   return vivos
 }
 
+// BUSCADOR (27 nov 2026, «sistema sencillo por rol») · antes había que recorrer la tabla para encontrar un pedido. Se busca
+// por cliente o folio, sin acentos ni mayúsculas, y en TODAS las ventas (no solo en el filtro elegido).
+const sinAcentos = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+export function buscarVentas(pedidos: OrderWithItems[], texto: string): OrderWithItems[] {
+  const q = sinAcentos(texto.trim())
+  if (!q) return pedidos
+  return pedidos.filter((o) => sinAcentos(o.external_ref ?? '').includes(q) || sinAcentos(clienteDePedido(o).name ?? '').includes(q))
+}
+
 function etiquetaPago(o: OrderWithItems): { label: string; pill: string } {
   if (o.payment_status === 'paid') return { label: 'Pagado', pill: 'p-ok' }
   if (o.payment_status === 'refunded') return { label: 'Reembolsado', pill: 'p-neu' }
@@ -48,6 +58,7 @@ export function MisVentas() {
   const { data: productos } = useProducts()
   const [filtro, setFiltro] = useState<FiltroVentas>(filtroInicial)
   const [abierto, setAbierto] = useState<string | null>(null)
+  const [buscar, setBuscar] = useState('')
   const mes = hoyNegocio().slice(0, 7)
 
   const nombreProducto = useMemo(() => {
@@ -56,7 +67,8 @@ export function MisVentas() {
     return m
   }, [productos])
 
-  const lista = useMemo(() => filtrarVentas(pedidos, filtro, mes), [pedidos, filtro, mes])
+  const buscando = buscar.trim() !== ''
+  const lista = useMemo(() => buscarVentas(filtrarVentas(pedidos, buscando ? 'todos' : filtro, mes), buscar), [pedidos, filtro, mes, buscar, buscando])
   const seg = useSeguimiento(lista.map((o) => o.id))
   const total = lista.reduce((s, o) => s + Number(o.total ?? 0), 0)
 
@@ -64,9 +76,10 @@ export function MisVentas() {
 
   return (
     <div className="grid" style={{ gap: 16 }} data-testid="mis-ventas">
+      <input type="search" className="np-buscar" value={buscar} onChange={(e) => { setBuscar(e.target.value); setAbierto(null) }} placeholder="Buscar por cliente o folio" aria-label="Buscar en mis ventas" data-testid="mis-ventas-buscar" />
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {FILTROS.map((f) => (
-          <button key={f.k} type="button" className={`btn sm ${filtro === f.k ? '' : 'ghost'}`} onClick={() => cambiar(f.k)} aria-pressed={filtro === f.k} data-testid={`mis-ventas-${f.k}`}>
+          <button key={f.k} type="button" className={`btn sm ${!buscando && filtro === f.k ? '' : 'ghost'}`} onClick={() => { setBuscar(''); cambiar(f.k) }} aria-pressed={!buscando && filtro === f.k} data-testid={`mis-ventas-${f.k}`}>
             {f.label}
           </button>
         ))}
@@ -76,7 +89,7 @@ export function MisVentas() {
       </div>
 
       {loading ? <Cargando etiqueta="Cargando tus ventas…" /> : lista.length === 0 ? (
-        <Vacio icono="bag" titulo={filtro === 'cobrar' ? 'No tienes pedidos por cobrar.' : filtro === 'mes' ? 'Aún no tienes ventas este mes.' : 'Aún no tienes ventas.'} />
+        <Vacio icono="bag" titulo={buscando ? `Ningún pedido coincide con «${buscar.trim()}».` : filtro === 'cobrar' ? 'No tienes pedidos por cobrar.' : filtro === 'mes' ? 'Aún no tienes ventas este mes.' : 'Aún no tienes ventas.'} />
       ) : (
         <div className="card" style={{ padding: '6px 14px 14px' }}>
           <table className="tbl-cards">
@@ -93,7 +106,7 @@ export function MisVentas() {
                     <tr onClick={() => setAbierto(abiertoEste ? null : o.id)} style={{ cursor: 'pointer' }} aria-expanded={abiertoEste} data-testid="mis-ventas-fila">
                       <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(o.created_at)}</td>
                       <td data-label="Pedido" className="mono">{o.external_ref ?? o.id.slice(0, 8)}</td>
-                      <td data-label="Cliente">{clienteDePedido(o).name || '—'}</td>
+                      <td data-label="Cliente">{capitalizarNombre(clienteDePedido(o).name) || '—'}</td>
                       <td data-label="Total" className="mono"><b>{money(Number(o.total ?? 0))}</b></td>
                       <td data-label="Pago"><span className={`pill ${pago.pill}`}>{pago.label}</span></td>
                       <td data-label="Dónde va" data-testid="mis-ventas-seguimiento"><span className={`pill ${et?.pill ?? st.pill}`}>{et?.texto ?? st.label}</span></td>

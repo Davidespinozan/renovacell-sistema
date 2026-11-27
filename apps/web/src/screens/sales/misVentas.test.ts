@@ -1,6 +1,6 @@
 // MIS VENTAS · la lista debe sumar EXACTAMENTE lo que muestran las cifras de Inicio (misma regla que CifrasVendedor).
 import { describe, expect, it } from 'vitest'
-import { filtrarVentas } from './MisVentas'
+import { buscarVentas, filtrarVentas } from './MisVentas'
 import type { OrderWithItems } from '../../data/hooks/useOrders'
 
 const p = (id: string, created_at: string, status: string, payment_status: string, total: number) =>
@@ -29,5 +29,25 @@ describe('filtrarVentas', () => {
   })
   it('todos: sin cancelados ni borradores', () => {
     expect(filtrarVentas(pedidos, 'todos', '2026-11').map((o) => o.id).sort()).toEqual(['a', 'b', 'd', 'e'])
+  })
+})
+
+describe('buscarVentas', () => {
+  const lista = [
+    { id: 'a', external_ref: 'S700101', doctor_id: null, shipping_meta: { customer: { name: 'ROCÍO UGALDE PEDROZA' } } },
+    { id: 'b', external_ref: 'S700102', doctor_id: null, shipping_meta: { customer: { name: 'Jorge Beltrán' } } },
+  ] as never[]
+  const ids = (t: string) => buscarVentas(lista, t).map((o: { id: string }) => o.id)
+  it('encuentra por cliente sin importar acentos ni mayúsculas', () => {
+    expect(ids('rocio')).toEqual(['a'])
+    expect(ids('BELTRAN')).toEqual(['b'])
+  })
+  it('encuentra por folio, completo o por un pedazo', () => {
+    expect(ids('S700102')).toEqual(['b'])
+    expect(ids('7001')).toEqual(['a', 'b'])
+  })
+  it('sin texto devuelve todo; sin coincidencias, nada', () => {
+    expect(ids('  ')).toEqual(['a', 'b'])
+    expect(ids('zzz')).toEqual([])
   })
 })

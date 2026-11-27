@@ -55,9 +55,13 @@ import { NuevoPedido } from './NuevoPedido'
 const CLIENTE = { id: '11111111-1111-4111-8111-111111111111', name: 'Ana Prueba', phone: null }
 const exito = (extra: object = {}) => ({ ok: true, order: { external_ref: 'S1001' }, ...extra })
 const montar = (props: Partial<React.ComponentProps<typeof NuevoPedido>> = {}) => render(<NuevoPedido customer={CLIENTE} placedBy="Lucía (Ventas)" onClose={() => {}} {...props} />)
-const boton = () => screen.getByRole('button', { name: /crear pedido|creando|guardando|reintentar envío/i }) as HTMLButtonElement
-const armar = () => { fireEvent.click(screen.getAllByRole('button').filter((b) => b.className === 'btn sm')[0]); fireEvent.click(screen.getByText('poner domicilio')) }
-const pedirFactura = () => fireEvent.click(screen.getAllByRole('checkbox').find((c) => !c.closest('[data-testid="np-entrega-preferida"]'))!)
+// PEDIDO POR PASOS (27 nov 2026) · productos, entrega y pago van en tres pantallas (las tres siguen montadas). Los
+// helpers avanzan como la persona: «Continuar» hasta el botón final. Si un paso no deja avanzar, el botón apagado ES
+// ese «Continuar» (mismo significado que antes: no se puede crear el pedido).
+const alFinal = () => { for (let i = 0; i < 2; i++) { const c = screen.queryByTestId('np-continuar') as HTMLButtonElement | null; if (c && !c.disabled) fireEvent.click(c) } }
+const boton = () => { alFinal(); return (screen.queryByRole('button', { name: /crear pedido|creando|guardando|reintentar envío/i }) ?? screen.getByTestId('np-continuar')) as HTMLButtonElement }
+const armar = () => { fireEvent.click(screen.getAllByRole('button', { hidden: true }).filter((b) => b.className === 'btn sm')[0]); fireEvent.click(screen.getByText('poner domicilio')) }
+const pedirFactura = () => fireEvent.click(screen.getAllByRole('checkbox', { hidden: true }).find((c) => !c.closest('[data-testid="np-entrega-preferida"]'))!)
 const alerta = vi.fn()
 
 beforeEach(() => {
@@ -269,7 +273,7 @@ describe('SEC-C4-FISCAL-3-FE · operación, reintentos y estados', () => {
     await conFacturaLista()
     fireEvent.click(boton())
     await screen.findByTestId('np-error-incierto')
-    fireEvent.click(screen.getAllByRole('button').filter((b) => b.className === 'btn sm')[0])   // +1 unidad
+    fireEvent.click(screen.getAllByRole('button', { hidden: true }).filter((b) => b.className === 'btn sm')[0])   // +1 unidad
     expect(await screen.findByTestId('np-reenvio-original')).toHaveTextContent('pedido ORIGINAL')
     fireEvent.click(boton())
     await waitFor(() => expect(h.pedidos).toHaveLength(2))
@@ -321,7 +325,7 @@ describe('SEC-C4-FISCAL-3-FE · operación, reintentos y estados', () => {
     montar(); armar()
     fireEvent.click(boton())
     await screen.findByTestId('np-error-rechazo')
-    fireEvent.click(screen.getAllByRole('button').filter((b) => b.className === 'btn sm')[0])
+    fireEvent.click(screen.getAllByRole('button', { hidden: true }).filter((b) => b.className === 'btn sm')[0])
     fireEvent.click(boton())
     await waitFor(() => expect(screen.getByText('Pedido creado')).toBeTruthy())
     expect(op(1).id).not.toBe(op(0).id)
@@ -345,5 +349,67 @@ describe('SEC-C4-FISCAL-3-FE · operación, reintentos y estados', () => {
     fireEvent.click(boton())
     await waitFor(() => expect(screen.getByText('Pedido confirmado')).toBeTruthy())
     expect(h.upserts).toEqual([[CLIENTE.id, CAPTURA]]); expect(op(1)).toEqual(op(0))
+  })
+})
+
+// PEDIDO POR PASOS (27 nov 2026, «sistema sencillo por rol») · una pregunta por pantalla y un botón que dice qué falta.
+describe('Levantar pedido · por pasos', () => {
+  const visible = (id: string) => !(screen.getByTestId(id) as HTMLElement).hidden
+  it('empieza en Productos; sin productos no se avanza y dice qué falta', () => {
+    montar()
+    expect(visible('np-paso-1')).toBe(true); expect(visible('np-paso-2')).toBe(false); expect(visible('np-paso-3')).toBe(false)
+    expect(screen.getByTestId('np-falta')).toHaveTextContent('Agrega al menos un producto.')
+    expect((screen.getByTestId('np-continuar') as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByTestId('np-continuar')).toHaveTextContent('Continuar a entrega')
+    expect(screen.queryByRole('button', { name: /crear pedido/i })).toBeNull()
+  })
+  it('con un producto pasa a Entrega; sin dirección no pasa a Pago y lo dice', () => {
+    montar()
+    fireEvent.click(screen.getAllByRole('button').filter((b) => b.className === 'btn sm')[0])
+    expect(screen.queryByTestId('np-falta')).toBeNull()
+    fireEvent.click(screen.getByTestId('np-continuar'))
+    expect(visible('np-paso-1')).toBe(false); expect(visible('np-paso-2')).toBe(true)
+    expect(screen.getByTestId('np-falta')).toHaveTextContent('Falta la dirección de entrega.')
+    expect((screen.getByTestId('np-continuar') as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByText('poner domicilio'))
+    expect((screen.getByTestId('np-continuar') as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(screen.getByTestId('np-continuar'))
+    expect(visible('np-paso-3')).toBe(true)
+    expect(screen.getByRole('button', { name: /crear pedido/i })).toBeTruthy()
+  })
+  it('«Atrás» regresa un paso sin perder lo capturado', () => {
+    montar(); armar(); boton()
+    expect(visible('np-paso-3')).toBe(true)
+    fireEvent.click(screen.getByTestId('np-atras'))
+    expect(visible('np-paso-2')).toBe(true)
+    fireEvent.click(screen.getByTestId('np-atras'))
+    expect(visible('np-paso-1')).toBe(true)
+    expect((screen.getByTestId('np-cantidad') as HTMLInputElement).value).toBe('1')
+    expect(screen.getByText('Cancelar')).toBeTruthy()   // en el primer paso el botón de la izquierda cierra
+  })
+  it('la cantidad se puede escribir; respeta la existencia y vacía quita el producto', async () => {
+    montar(); armar()
+    const cant = () => screen.getByTestId('np-cantidad') as HTMLInputElement
+    fireEvent.change(cant(), { target: { value: '7' } })
+    expect(cant().value).toBe('7')
+    fireEvent.change(cant(), { target: { value: '25' } })      // hay 10 en existencia
+    expect(cant().value).toBe('10')
+    fireEvent.click(boton())
+    await waitFor(() => expect(screen.getByText('Pedido creado')).toBeTruthy())
+    expect(h.pedidos[0].lines).toEqual([{ product_id: 'P1', qty: 10, unit_price: 100 }])
+  })
+  it('escribir 0 quita el producto y vuelve a pedir uno', () => {
+    montar(); armar()
+    fireEvent.change(screen.getByTestId('np-cantidad'), { target: { value: '0' } })
+    expect(screen.queryByTestId('np-cantidad')).toBeNull()
+    expect(screen.getByTestId('np-falta')).toHaveTextContent('Agrega al menos un producto.')
+  })
+  it('el encabezado dice en qué paso va y deja regresar a uno ya hecho', () => {
+    montar(); armar(); boton()
+    const pasos = screen.getByTestId('np-pasos')
+    expect(pasos.getAttribute('aria-label')).toBe('Paso 4 de 4')
+    fireEvent.click(screen.getByRole('button', { name: 'Productos' }))
+    expect(visible('np-paso-1')).toBe(true)
+    expect(pasos.getAttribute('aria-label')).toBe('Paso 2 de 4')
   })
 })

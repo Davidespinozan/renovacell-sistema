@@ -63,11 +63,11 @@ export function LinksPago({ cliente = clientePorDefecto }: { cliente?: ClienteLi
       {aviso && <div className="sysnote" role="status" style={{ background: 'var(--ok-bg)', color: 'var(--green-deep)' }}>{aviso}</div>}
       {porConfirmar.length > 0 && (
         <section className="sgs-grupo" data-testid="por-confirmar"><h3>Por confirmar · falta el pago <small>({porConfirmar.length})</small></h3>
-          <p className="sgs-sub" style={{ marginTop: 0 }}>No pasan a Almacén hasta confirmar la venta. Cuando el cliente pague, toca <b>Confirmar venta</b> y registra el pago.</p>
+          <p className="sgs-sub" style={{ marginTop: 0 }}>No pasan a Almacén hasta que se confirme el pago. Cuando el cliente pague, toca <b>Confirmar pago</b>.</p>
           <ul>{porConfirmar.slice(0, 50).map((o) => (
             <li key={o.id} className="sgs-item" data-testid="pedido-por-confirmar">
               <div className="sgs-tx"><b>{o.external_ref ?? 'Pedido'} · {clienteDe(o)}</b><span>{money(o.total ?? 0)} · {fmtDate(o.created_at)}{o.payment_status === 'parcial' ? ' · pago parcial' : ''}</span></div>
-              {cobra && <button type="button" className="btn sm" onClick={() => setCobrando(o)} data-testid="pedido-cobrar"><Check size={14} aria-hidden /> Confirmar venta</button>}
+              {cobra && <button type="button" className="btn sm" onClick={() => setCobrando(o)} data-testid="pedido-cobrar"><Check size={14} aria-hidden /> Confirmar pago</button>}
               <button type="button" className="btn ghost sm" disabled={pidiendo === o.id} onClick={() => void pedir(o.id, o.external_ref ?? 'el pedido')} data-testid="link-pedir"><CreditCard size={14} aria-hidden /> {pidiendo === o.id ? 'Pidiendo…' : 'Pedir link'}</button>
             </li>))}</ul>
         </section>
@@ -77,7 +77,7 @@ export function LinksPago({ cliente = clientePorDefecto }: { cliente?: ClienteLi
           <ul>{yaSalieron.slice(0, 30).map((o) => (
             <li key={o.id} className="sgs-item">
               <div className="sgs-tx"><b>{o.external_ref ?? 'Pedido'} · {clienteDe(o)}</b><span>{money(o.total ?? 0)}{o.payment_status === 'parcial' ? ' · pago parcial' : ''}</span></div>
-              {cobra && <button type="button" className="btn sm" onClick={() => setCobrando(o)} data-testid="pedido-cobrar">Cobrar</button>}
+              {cobra && <button type="button" className="btn sm" onClick={() => setCobrando(o)} data-testid="pedido-cobrar">Confirmar pago</button>}
               <button type="button" className="btn ghost sm" disabled={pidiendo === o.id} onClick={() => void pedir(o.id, o.external_ref ?? 'el pedido')} data-testid="link-pedir"><CreditCard size={14} aria-hidden /> {pidiendo === o.id ? 'Pidiendo…' : 'Pedir link'}</button>
             </li>))}</ul>
         </section>
@@ -125,7 +125,9 @@ function Fila({ l, cobra, cliente, hecho }: { l: LinkPago; cobra: boolean; clien
 }
 
 // COBRO-U · cobrar un pedido que ya existe con la MISMA «Forma de pago» de todos los puntos de venta.
-function CobrarPedido({ pedido, onClose, onHecho }: { pedido: { id: string; external_ref: string | null; total: number | null; shipping_meta?: unknown }; onClose: () => void; onHecho: (texto: string) => void }) {
+// UNA SOLA PALABRA (27 nov 2026): el botón de la lista decía «Confirmar venta», la ventana «Cobrar» y su botón
+// «Registrar». Ahora las tres dicen «Confirmar pago». Exportada: el Inicio de Ventas la abre sin pasar por el menú.
+export function CobrarPedido({ pedido, onClose, onHecho }: { pedido: { id: string; external_ref: string | null; total: number | null; shipping_meta?: unknown }; onClose: () => void; onHecho: (texto: string) => void }) {
   const [cobro, setCobro] = useState<CobroElegido | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -146,15 +148,17 @@ function CobrarPedido({ pedido, onClose, onHecho }: { pedido: { id: string; exte
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="cobrar-pedido">
-        <div className="mhead"><h3>Cobrar {folio} · {money(total)}</h3></div>
+        <div className="mhead"><h3>Confirmar pago de {folio} · {money(total)}</h3></div>
         <div className="mbody">
           <FormaDePago total={total} modo="pedido" tipoEntrega={tipoEntrega} value={cobro}
             onChange={(c) => { setCobro(c); if (c?.forma !== cobro?.forma) opId.current = globalThis.crypto?.randomUUID?.() ?? opId.current }} testId="cobrar-forma" />
           {error && <div className="pce-error" role="alert" style={{ marginTop: 10 }}>{error}</div>}
         </div>
         <div className="mfoot" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: 14 }}>
+          {/* Un botón apagado dice qué falta. */}
+          {!cobro && <span style={{ marginRight: 'auto', alignSelf: 'center', fontSize: 12.5, color: 'var(--ink-3)' }} data-testid="cobrar-falta">Elige cómo pagó el cliente.</span>}
           <button type="button" className="btn ghost" onClick={onClose}>Cancelar</button>
-          <button type="button" className="btn" disabled={!cobro || !!falta || enviando} onClick={() => void cobrar()} data-testid="cobrar-confirmar">{enviando ? 'Registrando…' : 'Registrar'}</button>
+          <button type="button" className="btn" disabled={!cobro || !!falta || enviando} onClick={() => void cobrar()} data-testid="cobrar-confirmar">{enviando ? 'Registrando…' : 'Confirmar pago'}</button>
         </div>
       </div>
     </div>

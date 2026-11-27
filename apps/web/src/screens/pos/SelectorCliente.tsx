@@ -24,9 +24,11 @@ const fila = { display: 'flex', alignItems: 'center', gap: 10, width: '100%', te
 const nota = { fontSize: 12.5, color: 'var(--ink-3)', padding: '8px 2px' }
 const titulo = { fontSize: 11.5, fontWeight: 600, color: 'var(--ink-3)', textTransform: 'uppercase' as const, letterSpacing: '.04em', margin: '12px 0 6px' }
 
-export function SelectorClienteVentas({ onPick, onClose, buscador, cartera = carteraPorDefecto, alExpirarSesion }: {
+export function SelectorClienteVentas({ onPick, onClose, buscador, cartera = carteraPorDefecto, alExpirarSesion, paraPedido = false }: {
   onPick: (c: ClienteElegido | null) => void
   onClose: () => void
+  /** «Levantar pedido» desde Inicio: un pedido siempre es de alguien, así que no se ofrece «Mostrador» y el título lo dice. */
+  paraPedido?: boolean
   /** Lo presta la Caja para conservar la caché en memoria mientras la pantalla está abierta. */
   buscador: BuscadorClientes
   cartera?: ClienteCartera
@@ -72,13 +74,13 @@ export function SelectorClienteVentas({ onPick, onClose, buscador, cartera = car
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="selector-cliente-ventas">
         <div className="mhead">
-          <div><h3>Cliente de la venta</h3><div className="ms">Opcional. Si es venta de mostrador, deja “Mostrador”.</div></div>
+          <div><h3>{paraPedido ? '¿Para quién es el pedido?' : 'Cliente de la venta'}</h3><div className="ms">{paraPedido ? 'Elige a un cliente de tu cartera, búscalo o regístralo.' : 'Opcional. Si es venta de mostrador, deja “Mostrador”.'}</div></div>
           <button className="mclose" type="button" onClick={onClose} aria-label="Cerrar"><Icon name="x" /></button>
         </div>
         <div className="mbody">
-          <button type="button" onClick={() => onPick(null)} style={{ ...fila, padding: '11px 12px' }} data-testid="sc-mostrador">
+          {!paraPedido && <button type="button" onClick={() => onPick(null)} style={{ ...fila, padding: '11px 12px' }} data-testid="sc-mostrador">
             <Icon name="store" style={{ width: 15, height: 15, color: 'var(--ink-3)' }} /> Mostrador · público general
-          </button>
+          </button>}
 
           {/* NUEVO PROSPECTO · alguien que la vendedora consiguió por su cuenta */}
           {registrando

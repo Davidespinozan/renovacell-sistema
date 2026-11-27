@@ -12,7 +12,7 @@
 // tiempo de espera se calcula aquí: lo da el servidor.
 import { Prospectar } from '../pos/Prospectar'   // PROSPECTAR · registrar + primer WhatsApp
 import { Icon } from '../../app/icons'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useRole } from '../../auth/RoleContext'
 import { getNav, getRole, pantallasAlcanzables, type RoleKey } from '../../app/roles'
 import { useBandeja, ListaTareas, porUrgencia, type Task } from '../Bandeja'
@@ -27,6 +27,12 @@ import { useAllOrders } from '../../data/hooks/useOrders'
 import { driverIdByEmail, driverName } from '../../data/mock/shipments'
 import { cargaPorConfirmar, confirmarTodaLaCarga, pedirParada } from '../../data/ops/rutaChofer'   // CHOFER · menos pasos
 import { toast } from '../../app/Toast'
+import { SelectorClienteVentas } from '../pos/SelectorCliente'
+import { BuscadorClientes } from '../../data/ops/buscarClientes'
+import { NuevoPedido } from '../sales/NuevoPedido'
+import { CobrarPedido } from '../cobros/LinksPago'
+import { pedidosPorConfirmar } from '../../data/ops/porConfirmar'
+import { useOrderMoney } from '../../data/hooks/useMoney'
 import { telParaMarcar } from '../../lib/telefono'
 import { deliveryOf } from '../../data/mock/profiles'
 import { AtajosMovil, Bienvenida, Cargando, ErrorLectura, Nota, Seccion, TarjetaAtencion, Tarjetas, Vacio, type Acceso } from './primitives'
@@ -76,6 +82,16 @@ export function HomeVendedor() {
     { key: 'caja', label: 'Punto de venta', icon: 'store' },
     { key: 'clientes', label: 'Clientes', icon: 'usercheck' },
   ])
+  // VENDER Y COBRAR DESDE INICIO (27 nov 2026, «sistema sencillo por rol»): no había botón para levantar un pedido (el
+  // camino era Clientes → cliente → ficha → «Levantar pedido») ni para confirmar un pago (Menú → Cobrar pedidos).
+  const { data: pedidos } = useAllOrders()
+  const { byOrder: dinero } = useOrderMoney()
+  const porConfirmar = useMemo(() => pedidosPorConfirmar(pedidos.filter((o) => (o.total ?? 0) > 0 && o.payment_status !== 'paid' && o.payment_status !== 'refunded'), dinero), [pedidos, dinero])
+  const buscador = useRef<BuscadorClientes | null>(null)
+  const [eligiendo, setEligiendo] = useState(false)
+  const [pedidoPara, setPedidoPara] = useState<{ id: string; name: string } | null>(null)
+  const [cobrando, setCobrando] = useState<(typeof pedidos)[number] | null>(null)
+  const clienteDe = (o: { shipping_meta?: unknown }) => capitalizarNombre(((o.shipping_meta as { customer?: { name?: string } } | null)?.customer?.name) ?? '') || 'Cliente'
   const detalle = !fuente ? 'Tu cartera y tus ventas de hoy.'
     : solicitudes.length ? solicitudes.length === 1 ? 'Un cliente te espera. El asistente lo atiende mientras llegas.' : `${solicitudes.length} clientes te esperan. El asistente los atiende mientras llegas.`
       : 'Sin solicitudes de asesor por ahora.'
@@ -83,6 +99,30 @@ export function HomeVendedor() {
     <div className="rh" data-testid="home-vendedor">
       {fuentes}
       <Bienvenida nombre={user?.name ?? ''} avatarUrl={user?.avatarUrl} titulo={saludo(user?.name)} detalle={detalle} etiqueta="Ventas" />
+      <button type="button" className="btn rh-vender" onClick={() => { buscador.current ??= new BuscadorClientes(); setEligiendo(true) }} data-testid="inicio-levantar-pedido">
+        <Icon name="plus" /> Levantar pedido
+      </button>
+      {porConfirmar.length > 0 && (
+        <Seccion titulo="Esperan pago para pasar a Almacén" nivel="atencion" conteo={porConfirmar.length} id="por-confirmar"
+          accion={porConfirmar.length > 4 ? { label: `Ver los ${porConfirmar.length}`, onClick: () => setScreen('links_pago') } : undefined}>
+          <div className="tasklist">
+            {porConfirmar.slice(0, 4).map((o) => (
+              <div key={o.id} className="taskrow" data-testid="inicio-por-confirmar">
+                <span className="taskrow-tx">
+                  <span className="taskrow-t">{clienteDe(o)}</span>
+                  <span className="taskrow-d"><span className="mono">{o.external_ref}</span> · {money(o.total ?? 0)} · pedido el {fmtDate(o.created_at)}</span>
+                </span>
+                <button type="button" className="btn sm" onClick={() => setCobrando(o)} data-testid="inicio-confirmar-pago">Confirmar pago</button>
+              </div>
+            ))}
+          </div>
+        </Seccion>
+      )}
+      {eligiendo && buscador.current && (
+        <SelectorClienteVentas paraPedido buscador={buscador.current} onClose={() => setEligiendo(false)} onPick={(c) => { setEligiendo(false); if (c) setPedidoPara({ id: c.id, name: c.name }) }} />
+      )}
+      {pedidoPara && <NuevoPedido customer={{ id: pedidoPara.id, name: pedidoPara.name, phone: null }} placedBy={`${user?.name ?? 'Ventas'} (Ventas)`} onClose={() => setPedidoPara(null)} />}
+      {cobrando && <CobrarPedido pedido={cobrando} onClose={() => setCobrando(null)} onHecho={(t) => { setCobrando(null); toast(t) }} />}
       <CifrasVendedor esperan={solicitudes.length + activas.reduce((n, c) => n + (c.sin_leer > 0 ? 1 : 0), 0)} onEsperan={() => setScreen('asesorias')} />
       <BandaProspectar />
       {fuente && (

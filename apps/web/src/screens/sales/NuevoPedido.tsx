@@ -2,6 +2,7 @@
 // Crea un pedido contra pedido idéntico a uno del Portal → cae solo en Almacén →
 // Preparar pedidos. Respeta el stock (mismo tope que el catálogo del doctor).
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { capitalizarNombre } from '../../lib/nombres'
 import { borrarBorrador, leerBorrador, useGuardarBorrador } from '../../data/store/borradores'
 import { avisar } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { X, Plus, Minus } from 'lucide-react'
@@ -137,6 +138,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   const entregaLista = hasSupabase ? eleccionCompleta(entrega, opsEntrega) : true
   // COBRO-U · la MISMA «Forma de pago» que la Caja y todos los puntos de venta; el pedido no se crea sin elegirla.
   const [cobro, setCobro] = useState<CobroElegido | null>(null)
+  const [paso, setPaso] = useState<1 | 2 | 3>(1)   // PEDIDO POR PASOS · 1 productos · 2 entrega · 3 pago
   const [cobroHecho, setCobroHecho] = useState<CobroElegido | null>(null)
 
   // Perfil fiscal (CFDI): AUTORIDAD = customers.meta.fiscal (master). Se precarga y se puede editar.
@@ -187,6 +189,14 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
     const max = sobrePedidoDe(id) ? Number.MAX_SAFE_INTEGER : info.tracked ? info.qty : 0
     const next = (c[id] ?? 0) + 1
     return next > max ? c : { ...c, [id]: next }
+  })
+  // Escribir la cantidad respeta el mismo tope que «+»: la existencia, salvo en productos sobre pedido. Vacío o 0 lo quita.
+  const ponerCantidad = (id: string, texto: string) => setCart((c) => {
+    const n = Math.floor(Number(texto))
+    if (!Number.isFinite(n) || n <= 0) { const { [id]: _q, ...rest } = c; return rest }
+    const info = stockInfoFor(stockMap, id)
+    const max = sobrePedidoDe(id) ? Number.MAX_SAFE_INTEGER : info.tracked ? info.qty : 0
+    return { ...c, [id]: Math.min(n, max) }
   })
   const dec = (id: string) => setCart((c) => {
     const q = (c[id] ?? 0) - 1
@@ -262,6 +272,17 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
   const cobroListo = !hasSupabase || faltaEnCobro(cobro, total + fleteCobro, 'pedido', tipoEntrega, hoyNegocio()) == null
   const formCambio = pendienteIncierto && intento.current ? huellaDe(solicitudActual()) !== intento.current.huella : false
   const deshabilitado = bloqueado || creando || savingFiscal || (!pendienteIncierto && (lines.length === 0 || (entregaNecesitaDireccion && !shipping) || !entregaLista || !cobroListo || !!faltaExtras || (invoice && !fiscalOk)))
+  // PEDIDO POR PASOS (27 nov 2026, «sistema sencillo por rol») · antes era una sola hoja larga con productos, dirección,
+  // entrega, pago y factura. Ahora es una pregunta por pantalla. Las tres partes siguen MONTADAS (lo capturado no se
+  // pierde al ir y volver; la lógica y lo que se manda no cambian): solo se muestra una. Un botón apagado dice qué falta.
+  const faltaPaso: Record<1 | 2 | 3, string | null> = {
+    1: lines.length === 0 ? 'Agrega al menos un producto.' : null,
+    2: entregaNecesitaDireccion && !shipping ? 'Falta la dirección de entrega.' : !entregaLista ? 'Falta elegir cómo se entrega.' : faltaExtras ? 'Revisa los envíos extra.' : null,
+    3: !cobroListo ? (cobro ? 'Completa la forma de pago.' : 'Elige cómo paga el cliente.') : invoice && !fiscalOk ? 'Completa los datos fiscales o quita la factura.' : null,
+  }
+  // Un envío sin confirmar o un conflicto se resuelven con el botón final, esté donde esté la persona.
+  const pasoFinal = paso === 3 || pendienteIncierto || bloqueado
+  const faltaAhora = creando || savingFiscal || pendienteIncierto || bloqueado ? null : pasoFinal ? (faltaPaso[1] ?? faltaPaso[2] ?? faltaPaso[3]) : faltaPaso[paso]
   const flete = hasSupabase && entrega ? fleteDeEleccion(entrega, opsEntrega) : 0   // PAQ-SIMPLE · solo la regla (o el ajuste con motivo)
 
   return (
@@ -282,9 +303,16 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
         ) : (
           <>
             <div className="mhead">
-              <div><h3>Levantar pedido</h3><div className="ms">A nombre de {target.name}{isCustomer ? ' · cliente comercial' : ''}</div></div>
+              <div><h3>Levantar pedido</h3><div className="ms">A nombre de {capitalizarNombre(target.name) || target.name}{isCustomer ? ' · cliente comercial' : ''}</div></div>
               <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
             </div>
+            <ol className="np-pasos" data-testid="np-pasos" aria-label={`Paso ${paso + 1} de 4`}>
+              {['Cliente', 'Productos', 'Entrega', 'Pago'].map((t, i) => (
+                <li key={t} className={i < paso ? 'hecho' : i === paso ? 'actual' : undefined} aria-current={i === paso ? 'step' : undefined}>
+                  {i > 0 && i < paso ? <button type="button" onClick={() => setPaso(i as 1 | 2)}>{t}</button> : t}
+                </li>
+              ))}
+            </ol>
             <div className="mbody">
               {avisoBorrador && (
                 <div className="borrador-aviso" role="status" data-testid="borrador-recuperado">
@@ -292,6 +320,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                   <button type="button" className="rc-link" onClick={() => { setCart({}); setInvoice(false); borrarBorrador(claveBorrador); setAvisoBorrador(false) }}>Empezar de nuevo</button>
                 </div>
               )}
+              <div hidden={paso !== 1} data-testid="np-paso-1">
               <input
                 value={buscar}
                 onChange={(e) => { setBuscar(e.target.value); setCartIds(new Set(Object.keys(cart).filter((id) => (cart[id] ?? 0) > 0))) }}
@@ -321,7 +350,10 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                         {(() => { const promo = etiquetaNivel(p.price, volRules, p.id, qty, vq[p.id]) ?? volumePromoLabel(p.price, volRules, p.id); return promo ? <div style={{ fontSize: 11, color: 'var(--green-deep)', fontWeight: 600 }}>{promo}</div> : null })()}
                       </div>
                       {qty > 0 && <button className="btn ghost sm" type="button" aria-label={`Quitar uno de ${p.name}`} onClick={() => dec(p.id)}><Minus size={14} /></button>}
-                      {qty > 0 && <span className="mono" style={{ minWidth: 18, textAlign: 'center' }}>{numeroVista(p, qty)}</span>}
+                      {/* CANTIDAD ESCRITA (27 nov 2026): 20 cajas eran 20 toques. En media caja se sigue con + y − (va en cajas con medios). */}
+                      {qty > 0 && (esMediaCaja(p)
+                        ? <span className="mono" style={{ minWidth: 18, textAlign: 'center' }}>{numeroVista(p, qty)}</span>
+                        : <input className="np-cant mono" type="number" inputMode="numeric" min={0} value={qty} aria-label={`Cantidad de ${p.name}`} onChange={(e) => ponerCantidad(p.id, e.target.value)} data-testid="np-cantidad" />)}
                       <button className="btn sm" type="button" aria-label={`Agregar ${p.name}`} disabled={out} style={out ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => add(p.id)}><Plus size={14} /></button>
                     </div>
                   )
@@ -333,9 +365,13 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                 nombreDe={(id) => lines.find((l) => l.p!.id === id)?.p!.name ?? 'este producto'}
                 disponible={(id) => { const i = stockInfoFor(stockMap, id); return i.tracked ? i.qty : 0 }}
                 onAgregar={(id, n) => setCart((c) => ({ ...c, [id]: (c[id] ?? 0) + n }))} />
+              </div>
+              <div hidden={paso !== 3} data-testid="np-resumen">
               {flete > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 12.5 }} data-testid="np-flete"><span>Flete</span><span className="mono">{money(flete)}</span></div>}
               {costoExtras > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 12.5 }} data-testid="np-extras"><span>{extras.length === 1 ? 'Envío extra' : `${extras.length} envíos extra`}</span><span className="mono">{money(costoExtras)}</span></div>}
               <div className="cototal" style={{ marginTop: 14 }}><span>Total</span><b data-testid="np-total">{money(total + flete + costoExtras)}</b></div>
+              </div>
+              <div hidden={paso !== 2} data-testid="np-paso-2">
 
               <div className="eyebrow" style={{ marginTop: 14 }}>Dirección de entrega{opsEntrega && !entregaNecesitaDireccion ? <span style={{ fontWeight: 400, color: 'var(--ink-3)' }}> · opcional para esta entrega</span> : null}</div>
               {isCustomer
@@ -369,6 +405,12 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                       {...(isCustomer ? { customer: { id: customer!.id, phone: customer!.phone ?? null } } : { doctorId: doctor!.id })} />
                   )}
                   {faltaExtras && <div role="alert" style={{ marginTop: 6, fontSize: 12, color: 'var(--warn)' }} data-testid="np-extras-falta">{faltaExtras}</div>}
+                </>
+              )}
+              </div>
+              <div hidden={paso !== 3} data-testid="np-paso-3">
+              {hasSupabase && (
+                <>
                   <div className="eyebrow" style={{ marginTop: 14 }}>Forma de pago</div>
                   <FormaDePago total={total + fleteCobro} modo="pedido" tipoEntrega={tipoEntrega} value={cobro} onChange={setCobro} testId="np-forma-pago" />
                 </>
@@ -395,6 +437,7 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                 </div>
               )}
 
+              </div>
               {errorPedido && (
                 <div role="alert" data-testid={`np-error-${errorPedido.motivo}`} style={{ marginTop: 14, padding: '10px 12px', borderRadius: 10, background: errorPedido.motivo === 'incierto' ? 'var(--warn-bg, var(--danger-bg))' : 'var(--danger-bg)', color: errorPedido.motivo === 'incierto' ? 'var(--warn, var(--danger))' : 'var(--danger)', fontSize: 13 }}>
                   <b>{errorPedido.motivo === 'incierto' ? 'No se pudo confirmar el pedido.' : errorPedido.motivo === 'conflicto' ? 'No se creó un pedido nuevo.' : errorPedido.motivo === 'fiscal' ? 'El pedido no se creó: revisa los datos fiscales.' : 'El pedido no se creó.'}</b> {errorPedido.msg}
@@ -402,10 +445,16 @@ export function NuevoPedido({ doctor, customer, placedBy, onClose, initialCart, 
                 </div>
               )}
               {/* CALIDAD VISUAL · el total y «Crear pedido» siempre a la vista (pie fijo del modal) */}
+              {/* Un botón apagado dice qué falta (antes «Crear pedido» se apagaba sin explicar). */}
+              {faltaAhora && <div className="np-falta" role="status" data-testid="np-falta">{faltaAhora}</div>}
               <div className="barra-accion np-pie">
                 <span className="np-pie-total">Total <b className="mono">{money(total + flete + costoExtras)}</b></span>
-                <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
-                <button className="btn" type="button" disabled={deshabilitado} style={deshabilitado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>{savingFiscal ? 'Guardando…' : creando ? 'Creando pedido…' : pendienteIncierto ? 'Reintentar envío' : 'Crear pedido'}</button>
+                {paso > 1 && !pendienteIncierto && !bloqueado
+                  ? <button className="btn ghost" type="button" onClick={() => setPaso((paso - 1) as 1 | 2)} data-testid="np-atras">Atrás</button>
+                  : <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>}
+                {pasoFinal
+                  ? <button className="btn" type="button" disabled={deshabilitado} style={deshabilitado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={crear}>{savingFiscal ? 'Guardando…' : creando ? 'Creando pedido…' : pendienteIncierto ? 'Reintentar envío' : 'Crear pedido'}</button>
+                  : <button className="btn" type="button" disabled={!!faltaPaso[paso]} style={faltaPaso[paso] ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => setPaso((paso + 1) as 2 | 3)} data-testid="np-continuar">{paso === 1 ? 'Continuar a entrega' : 'Continuar a pago'}</button>}
               </div>
             </div>
           </>

@@ -296,3 +296,18 @@ describe('SEC-C4-B3 · guardas de fuente', () => {
     expect(c.match(/useCustomers\(/g)).toHaveLength(1)
   })
 })
+
+// «LEVANTAR PEDIDO» DESDE INICIO (27 nov 2026): un pedido siempre es de alguien; no se ofrece «Mostrador».
+describe('SelectorClienteVentas · para un pedido', () => {
+  it('pregunta para quién es y no ofrece «Mostrador»; la cartera y el buscador siguen ahí', async () => {
+    const buscador = new BuscadorClientes({ identidad: () => 'U-LUCIA', transporte: async () => ({ ok: true, data: [] }) as never })
+    const c = new ClienteCartera(async () => ({ data: [{ profile_id: 'P1', customer_id: 'C1', nombre: 'Dra. Ana Ruiz', asignado_at: 'T' }], error: null }))
+    const elegidos: Array<ClienteElegido | null> = []
+    render(<SelectorClienteVentas paraPedido buscador={buscador} cartera={c} onPick={(x) => elegidos.push(x)} onClose={() => {}} />)
+    expect(screen.getByRole('heading', { name: '¿Para quién es el pedido?' })).toBeTruthy()
+    expect(screen.queryByTestId('sc-mostrador')).toBeNull()
+    expect(screen.getByLabelText('Buscar cliente')).toBeTruthy()
+    fireEvent.click(await screen.findByTestId('sc-cartera-fila'))
+    expect(elegidos[0]?.id).toBe('C1')
+  })
+})
