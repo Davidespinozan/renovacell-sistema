@@ -33,7 +33,7 @@ describe('isSurtible — más casos', () => {
 describe('statusView — estatus intermedios', () => {
   it('draft y picking mapean a su paso', () => {
     expect(statusView('draft')).toMatchObject({ label: 'Borrador', step: 0 })
-    expect(statusView('picking')).toMatchObject({ label: 'En surtido', step: 1 })
+    expect(statusView('picking')).toMatchObject({ label: 'En almacén', step: 1 })
   })
   it('cancelado tiene su etiqueta', () => {
     expect(statusView('cancelled').label).toBe('Cancelado')

@@ -19,13 +19,14 @@ import { avanceDeCobro } from '../../data/kpis'
 import { esteMes, mesPasado, todoElHistorico, hoyNegocio, diaNegocio } from '../../data/periodo'
 import { cifra, AvisoKpi } from '../../app/Kpi'
 import { doctorActivity, leadTime, valorEnRiesgo, doctoresEnRiesgo, DIAS_RIESGO } from '../../data/metrics'
-import { statusView } from '../doctor/orderStatus'
+import { statusView, seSurteSinPago } from '../doctor/orderStatus'
 import { daysUntil, severity, sevPill, sevLabel } from '../warehouse/expiry'
 
-type Bucket = 'Pedido' | 'Empacado' | 'En camino' | 'Entregado'
-function bucketOf(status: string | null): Bucket | null {
-  if (['draft', 'pending_payment', 'paid', 'picking'].includes(status ?? '')) return 'Pedido'
-  if (status === 'packed') return 'Empacado'
+// UN SOLO IDIOMA (27 nov 2026): los mismos cuatro pasos que el resto del sistema (antes Pedido · Empacado · En camino · Entregado).
+type Bucket = 'Por confirmar' | 'En almacén' | 'En camino' | 'Entregado'
+function bucketOf(status: string | null, sinPago = false): Bucket | null {
+  if (status === 'draft' || (status === 'pending_payment' && !sinPago)) return 'Por confirmar'
+  if (['pending_payment', 'paid', 'picking', 'packed'].includes(status ?? '')) return 'En almacén'
   if (status === 'shipped') return 'En camino'
   if (status === 'delivered' || status === 'fulfilled') return 'Entregado'
   return null // cancelado
@@ -64,9 +65,9 @@ export function Tablero() {
   const avance = kMes.data ? avanceDeCobro(kMes.data) : null
 
   const porEstatus = useMemo(() => {
-    const acc: Record<Bucket, number> = { Pedido: 0, Empacado: 0, 'En camino': 0, Entregado: 0 }
+    const acc: Record<Bucket, number> = { 'Por confirmar': 0, 'En almacén': 0, 'En camino': 0, Entregado: 0 }
     orders.forEach((o) => {
-      const b = bucketOf(o.status)
+      const b = bucketOf(o.status, seSurteSinPago(o))
       if (b) acc[b] += 1
     })
     return acc
@@ -133,7 +134,7 @@ export function Tablero() {
         </div>
       </div>
       <div className="tb-estatus" aria-label="Pedidos por estatus">
-        {(['Pedido', 'Empacado', 'En camino', 'Entregado'] as Bucket[]).map((b) => (
+        {(['Por confirmar', 'En almacén', 'En camino', 'Entregado'] as Bucket[]).map((b) => (
           <span key={b}><b className="mono">{porEstatus[b]}</b> {b}</span>
         ))}
         <span style={{ marginLeft: 'auto' }}>
@@ -215,7 +216,7 @@ export function Tablero() {
             <thead><tr><th>Pedido</th><th>Estatus</th><th>Fecha</th><th>Total</th></tr></thead>
             <tbody>
               {recientes.map((o) => {
-                const sv = statusView(o.status)
+                const sv = statusView(o.status, { liberado: seSurteSinPago(o) })
                 return (
                   <tr key={o.id}>
                     <td data-label="Pedido" className="mono">{o.external_ref}</td>

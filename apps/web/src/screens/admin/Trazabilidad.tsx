@@ -13,7 +13,7 @@ import { useLots } from '../../data/hooks/useLots'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { daysUntil } from '../warehouse/expiry'
-import { statusView } from '../doctor/orderStatus'
+import { statusView, seSurteSinPago } from '../doctor/orderStatus'
 import { useDoctors } from '../../data/hooks/useDoctors'
 import { clientOf } from '../../data/mock/profiles'
 import { costOf } from '../../data/mock/costs'
@@ -233,7 +233,7 @@ function PorPedido({ orders, movements, lotById, prodName, clientName }: {
     return [...porRenglon, ...porMovimiento]
   }, [movements, order])
   if (!order) return <div className="card">No hay pedidos registrados.</div>
-  const sv = statusView(order.status)
+  const sv = statusView(order.status, { liberado: seSurteSinPago(order) })
 
   return (
     <>

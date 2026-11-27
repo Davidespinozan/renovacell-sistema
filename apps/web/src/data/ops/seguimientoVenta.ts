@@ -27,14 +27,18 @@ export function etapaSeguimiento(o: { status?: string | null; payment_method?: s
   const s = seguimientoDe(o) ?? {}
   if (o.status === 'cancelled') return { etapa: 'cancelado', texto: 'Cancelado', pill: 'p-neu' }
   if (s.entregado_at || o.status === 'delivered') return { etapa: 'entregado', texto: s.entregado_at ? `Entregado ${fechaHora(s.entregado_at)}` : 'Entregado', pill: 'p-ok' }
-  if (s.salio_at || o.status === 'shipped') return { etapa: 'salio', texto: s.salio_at ? `Salió ${fechaHora(s.salio_at)}` : 'Salió del almacén', pill: 'p-blue' }
-  if (s.empacado_at || o.status === 'packed') return { etapa: 'empacado', texto: s.empacado_at ? `Empacado ${fechaHora(s.empacado_at)}` : 'Empacado', pill: 'p-warn' }
+  // UN SOLO IDIOMA (27 nov 2026): primero el paso con las palabras de todos; después, el detalle (cuándo).
+  if (s.salio_at || o.status === 'shipped') {
+    if ((o.shipping_meta as { method?: string } | null)?.method === 'recoge') return { etapa: 'salio', texto: 'Listo para recoger', pill: 'p-warn' }
+    return { etapa: 'salio', texto: s.salio_at ? `En camino · salió ${fechaHora(s.salio_at)}` : 'En camino', pill: 'p-blue' }
+  }
+  if (s.empacado_at || o.status === 'packed') return { etapa: 'empacado', texto: s.empacado_at ? `En almacén · preparado ${fechaHora(s.empacado_at)}` : 'En almacén · preparado', pill: 'p-blue' }
   // SOBRE PEDIDO (26 nov 2026): vendido sin existencia; no se surte ni se factura hasta que llegue la mercancía.
   if ((((o.shipping_meta as { sobre_pedido?: unknown[] } | null)?.sobre_pedido) ?? []).length > 0 && (o.status === 'paid' || o.status === 'pending_payment'))
     return { etapa: 'esperando_mercancia', texto: 'Esperando mercancía (sobre pedido)', pill: 'p-warn' }
   // POR CONFIRMAR · sin pago (ni crédito / paga al recibir) no llega a Almacén: no está «en almacén», espera el pago.
-  if (o.status === 'pending_payment' && !['contra_entrega', 'credito'].includes(o.payment_method ?? '')) return { etapa: 'por_confirmar', texto: 'Por confirmar (falta el pago)', pill: 'p-warn' }
-  return { etapa: 'almacen', texto: 'Aún en almacén', pill: 'p-neu' }
+  if (o.status === 'pending_payment' && !['contra_entrega', 'credito'].includes(o.payment_method ?? '')) return { etapa: 'por_confirmar', texto: 'Por confirmar · falta el pago', pill: 'p-warn' }
+  return { etapa: 'almacen', texto: 'En almacén · por preparar', pill: 'p-blue' }
 }
 
 // TRAZABILIDAD PARA TODOS (26 nov 2026, dueño): Dirección y vendedoras leen el seguimiento de los pedidos que ven.

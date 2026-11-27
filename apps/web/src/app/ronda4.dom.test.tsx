@@ -91,9 +91,9 @@ import fuenteOrderCard from '../screens/doctor/OrderCard.tsx?raw'
 import fuenteCaja from '../screens/pos/Caja.tsx?raw'
 describe('Pedido del doctor y Punto de venta', () => {
   it('la barra de avance dice qué sigue (el estado ya va en la etiqueta)', () => {
-    render(<Trk step={1} />)
-    expect(document.querySelector('.trk-compacto-tx')?.textContent).toContain('Sigue: Empacado')
-    cleanup(); render(<Trk step={4} />)
+    render(<Trk step={1} />)   // UN SOLO IDIOMA: Pedido · En almacén · En camino · Entregado
+    expect(document.querySelector('.trk-compacto-tx')?.textContent).toContain('Sigue: En camino')
+    cleanup(); render(<Trk step={3} />)
     expect(document.querySelector('.trk-compacto-tx')?.textContent).toContain('Completado')
   })
   it('la línea de pago ya no repite «Pagado»; el cliente de la venta va arriba en celular', () => {

@@ -160,7 +160,7 @@ export function Surtido() {
                       {creditoVencido(d) ? 'Crédito vencido' : 'A crédito · sin pagar'}
                     </span>
                   })()}
-                  <span className={'pill ' + sv.pill}><span className="d" /> {sv.label}</span>
+                  <span className="pill p-warn"><span className="d" /> Por preparar</span>
                   {!canDo && (esSobrePedido(o) ? <span className="pill p-warn" data-testid="surtido-esperando">Esperando mercancía · sobre pedido</span> : <span className="pill p-dang">Sin stock suficiente</span>)}
                   {canDo && esSobrePedido(o) && <span className="pill p-ok" data-testid="surtido-ya-llego">Sobre pedido · ya llegó, se puede surtir</span>}
                   <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(o.created_at)}</span>
@@ -240,7 +240,7 @@ export function SurtirModal({
               <div className="ck"><Icon name="check" /></div>
               <h3>Pedido surtido</h3>
               <p>
-                <b>{order.external_ref}</b> quedó <b>listo para empacar</b>. Ya se descontó del inventario
+                <b>{order.external_ref}</b> quedó <b>preparado</b>. Ya se descontó del inventario
                 y quedó registrado de dónde salió cada producto. El doctor ya lo ve en su seguimiento.
               </p>
               <button className="btn" type="button" style={{ marginTop: 16 }} onClick={onClose}>Listo</button>

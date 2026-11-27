@@ -8,7 +8,7 @@ import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
 import { clienteDePedido } from '../../data/mock/profiles'
 import { diaNegocio, hoyNegocio } from '../../data/periodo'
-import { statusView } from '../doctor/orderStatus'
+import { statusView, seSurteSinPago } from '../doctor/orderStatus'
 import { etapaSeguimiento, fechaHora, useSeguimiento } from '../../data/ops/seguimientoVenta'   // TRAZABILIDAD (26 nov)
 import { Cargando, Vacio } from '../../app/EmptyState'
 import { fmtDate, money } from '../../lib/format'
@@ -97,7 +97,7 @@ export function MisVentas() {
             <tbody>
               {lista.map((o) => {
                 const pago = etiquetaPago(o)
-                const st = statusView(o.status)
+                const st = statusView(o.status, { liberado: seSurteSinPago(o) })
                 const s = seg[o.id]
                 const et = s ? etapaSeguimiento({ status: o.status, payment_method: o.payment_method, shipping_meta: o.shipping_meta, seguimiento: s }) : null
                 const abiertoEste = abierto === o.id

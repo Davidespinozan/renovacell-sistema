@@ -5,7 +5,7 @@ import { useRastreo } from '../../data/hooks/useRastreo'
 import { RastreoEnvio } from '../../app/RastreoEnvio'
 import { Icon } from '../../app/icons'
 import { money, fmtDate } from '../../lib/format'
-import { statusView } from './orderStatus'
+import { statusView, seSurteSinPago } from './orderStatus'
 import { esRecoge } from '../../data/ops/seguimiento'
 import { Trk } from './Trk'
 import { isCancelable, type OrderWithItems } from '../../data/hooks/useOrders'
@@ -35,7 +35,7 @@ export function OrderCard({
   dinero?: OrderMoney | null
   pagoReportado?: boolean
 }) {
-  const sv = statusView(order.status, { recoge: esRecoge(order) })
+  const sv = statusView(order.status, { recoge: esRecoge(order), liberado: seSurteSinPago(order) })
   // Con libro de dinero, "por pagar" es tener SALDO: un pago parcial sigue pendiente.
   const saldo = dinero ? dinero.saldo : (order.payment_status === 'paid' ? 0 : (order.total ?? 0))
   const unpaid = saldo > 0.0001 && order.status !== 'cancelled'

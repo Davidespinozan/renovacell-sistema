@@ -20,7 +20,7 @@ import { formatAddress } from '../../data/ops/shippingAddress'
 import type { CustomerFields } from '../../data/store/customersStore'
 import { supabase } from '../../lib/supabase'
 import { NuevoPedido } from '../sales/NuevoPedido'
-import { statusView } from '../doctor/orderStatus'
+import { statusView, seSurteSinPago } from '../doctor/orderStatus'
 import type { Profile } from '../../data/types'
 import { usePushEstado, EtiquetaPush } from '../../data/hooks/usePushEstado'   // PUSH SIEMPRE
 
@@ -472,7 +472,7 @@ function DoctorDetail({
               <thead><tr><th>Folio</th><th>Estatus</th><th>Fecha</th><th>Total</th></tr></thead>
               <tbody>
                 {history.map((o) => {
-                  const sv = statusView(o.status)
+                  const sv = statusView(o.status, { liberado: seSurteSinPago(o) })
                   return (
                     <tr key={o.id}>
                       <td data-label="Folio" className="mono">{o.external_ref}</td>

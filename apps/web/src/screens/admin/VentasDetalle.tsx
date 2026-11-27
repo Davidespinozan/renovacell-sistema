@@ -26,7 +26,7 @@ import { creditoAbierto, creditoVencido, etiquetaLiberacion } from '../../data/o
 import { AMBIGUO_MSG, newOpId } from '../../data/ops/w1Command'
 import { useRole } from '../../auth/RoleContext'
 import { salesSummary, topProducts, canalDeVenta, ventasPorCanal, CANALES, CANAL_TEXTO, type CanalVenta } from '../../data/metrics'
-import { statusView } from '../doctor/orderStatus'
+import { statusView, seSurteSinPago } from '../doctor/orderStatus'
 import { esRecoge } from '../../data/ops/seguimiento'
 import { ExportButton } from '../../app/ExportButton'
 import { CancelOrderModal } from '../../app/CancelOrderModal'
@@ -49,13 +49,13 @@ interface PayInfo { key: Exclude<PayFilter, 'todos'>; label: string; pill: strin
 function payInfo(o: OrderWithItems, m?: OrderMoney | null): PayInfo {
   if (!m) {
     if (o.payment_status === 'paid') return { key: 'pagado', label: 'Pagado', pill: 'p-ok' }
-    return { key: 'pendiente', label: 'Pendiente', pill: 'p-neu' }
+    return { key: 'pendiente', label: 'Por cobrar', pill: 'p-neu' }
   }
   if (m.estado_pago === 'paid') return { key: 'pagado', label: 'Pagado', pill: 'p-ok' }
   if (creditoAbierto(m)) return { key: 'contra', label: creditoVencido(m) ? 'Crédito vencido' : 'A crédito', pill: creditoVencido(m) ? 'p-dang' : 'p-warn' }
   if (m.estado_pago === 'parcial') return { key: 'parcial', label: 'Pago parcial', pill: 'p-warn' }
   if (m.estado_pago === 'refunded') return { key: 'pendiente', label: 'Reembolsado', pill: 'p-neu' }
-  return { key: 'pendiente', label: 'Pendiente', pill: 'p-neu' }
+  return { key: 'pendiente', label: 'Por cobrar', pill: 'p-neu' }
 }
 const channelOf = (o: OrderWithItems): CanalVenta => canalDeVenta(o)   // CANAL DE VENTA · quién capturó el pedido
 
@@ -201,7 +201,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
           <option value="pagado">Pagado</option>
           <option value="parcial">Pago parcial</option>
           <option value="contra">A crédito</option>
-          <option value="pendiente">Pendiente</option>
+          <option value="pendiente">Por cobrar</option>
         </select>
         <select style={sel} value={entrega} onChange={(e) => setEntrega(e.target.value as EntregaFilter)} aria-label="Entrega" data-testid="ventas-filtro-entrega">
           <option value="todos">Toda entrega</option>
@@ -213,12 +213,12 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
         </select>
         {conSeguimiento && (
           <select style={sel} value={etapa} onChange={(e) => setEtapa(e.target.value as 'todos' | EtapaSeguimiento)} aria-label="Seguimiento" data-testid="ventas-filtro-seguimiento">
-            <option value="todos">Todo seguimiento</option>
-            <option value="por_confirmar">Por confirmar (falta el pago)</option>
+            <option value="todos">En cualquier paso</option>
+            <option value="por_confirmar">Por confirmar · falta el pago</option>
             <option value="esperando_mercancia">Esperando mercancía (sobre pedido)</option>
-            <option value="almacen">Aún en almacén</option>
-            <option value="empacado">Empacado</option>
-            <option value="salio">Salió del almacén</option>
+            <option value="almacen">En almacén · por preparar</option>
+            <option value="empacado">En almacén · preparado</option>
+            <option value="salio">En camino o listo para recoger</option>
             <option value="entregado">Entregado</option>
           </select>
         )}
@@ -236,7 +236,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
           { key: 'id', label: 'Destino', format: (_v, o) => { const a = orderAddress(o.shipping_meta); return a ? [a.city, (a as { state?: string }).state].filter(Boolean).join(', ') : '' } },
           { key: 'total', label: 'Total', format: (v) => money(v as number) },
           { key: 'id', label: 'Cobro', format: (_v, o) => payInfo(o, byOrder[o.id]).label },
-          { key: 'status', label: 'Estatus', format: (_v, o) => statusView(o.status, { recoge: esRecoge(o) }).label },
+          { key: 'status', label: 'Estatus', format: (_v, o) => statusView(o.status, { recoge: esRecoge(o), liberado: seSurteSinPago(o) }).label },
           { key: 'invoice_requested', label: 'Factura', format: (v) => (v ? 'Solicitada' : '') },
           ...(conSeguimiento ? [
             { key: 'id' as const, label: 'Empacado', format: (_v: unknown, o: OrderWithItems) => fechaHora(seguimientoDe(o)?.empacado_at) },
@@ -283,7 +283,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
             </thead>
             <tbody>
               {rows.map((o) => {
-                const p = payInfo(o, byOrder[o.id]); const sv = statusView(o.status, { recoge: esRecoge(o) }); const canal = channelOf(o)
+                const p = payInfo(o, byOrder[o.id]); const sv = statusView(o.status, { recoge: esRecoge(o), liberado: seSurteSinPago(o) }); const canal = channelOf(o)
                 return (
                   <tr key={o.id} className="clickrow" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click() } }} onClick={() => setSelected(o.id)}>
                     <td data-label="Folio" className="mono">{o.external_ref}</td>
@@ -375,7 +375,7 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
   onClose: () => void
   onCancel: () => void
 }) {
-  const p = payInfo(order, dinero); const sv = statusView(order.status, { recoge: esRecoge(order) })
+  const p = payInfo(order, dinero); const sv = statusView(order.status, { recoge: esRecoge(order), liberado: seSurteSinPago(order) })
   const { user, role } = useRole()
   const { data: refunds, refundedByOrder } = useRefunds()
   const { data: entries } = usePaymentEntries()

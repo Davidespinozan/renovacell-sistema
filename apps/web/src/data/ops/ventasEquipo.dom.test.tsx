@@ -36,7 +36,7 @@ describe('Ventas del equipo (jefe de ventas)', () => {
     render(<VentasEquipo />); verTodo()
     const celdas = screen.getAllByTestId('venta-seguimiento').map((c) => c.textContent)
     expect(celdas.some((t) => /Entregado 24 nov/.test(t ?? ''))).toBe(true)
-    expect(celdas).toContain('Aún en almacén')
+    expect(celdas).toContain('En almacén · por preparar')
     fireEvent.change(screen.getByTestId('ventas-filtro-seguimiento'), { target: { value: 'almacen' } })
     expect(screen.queryByText('S1')).toBeNull(); expect(screen.getByText('S2')).toBeTruthy()
     fireEvent.change(screen.getByTestId('ventas-filtro-seguimiento'), { target: { value: 'todos' } })
