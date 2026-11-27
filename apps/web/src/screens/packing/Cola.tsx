@@ -70,7 +70,9 @@ export function metodoSugerido(e: EntregaPedido | null): Method {
 }
 const hoyLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mazatlan', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 
-export function EntregaPill({ e }: { e: EntregaPedido | null }) {
+export function EntregaPill({ e, sinSalida }: { e: EntregaPedido | null
+  /** La fila del día ya dice cuándo sale en el encabezado del grupo: dentro de la tarjeta no se repite. */
+  sinSalida?: boolean }) {
   if (!e) return null
   const hoy = hoyLocal()
   const corte = useCorteEntrega()
@@ -78,7 +80,7 @@ export function EntregaPill({ e }: { e: EntregaPedido | null }) {
   const s = salidaDePedido(e, hoy, corte)
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '0 0 10px', fontSize: 12.5 }} data-testid="cola-entrega">
-      {s && <span className={'pill ' + (s.cuando === 'atrasado' ? 'p-dang' : s.cuando === 'hoy' ? 'p-warn' : 'p-neu')} data-testid="pedido-salida">{s.etiqueta}</span>}
+      {s && !sinSalida && <span className={'pill ' + (s.cuando === 'atrasado' ? 'p-dang' : s.cuando === 'hoy' ? 'p-warn' : 'p-neu')} data-testid="pedido-salida">{s.etiqueta}</span>}
       <b>{e.tipo === 'foraneo' && e.paqueteria ? NOMBRE_PAQUETERIA[e.paqueteria] ?? e.texto : e.texto}</b>
       <span style={{ color: 'var(--ink-3)' }}>· {promesaDe(e, hoy)}{e.flete ? ` · flete ${money(e.flete)}` : ''}</span>
     </div>

@@ -124,7 +124,7 @@ export function HoyAlmacen() {
                 <b style={{ fontSize: 14 }}>{meta.customer?.name ?? 'Cliente'}</b>
                 <span className={'pill ' + (o.__accion.tipo === 'preparar' ? 'p-warn' : o.__accion.tipo === 'despacho' ? 'p-blue' : 'p-ok')} data-testid="hoy-paso">{o.__accion.tipo === 'preparar' ? 'Por preparar' : o.__accion.tipo === 'despacho' ? `Con ${driverName(envio?.driver_id ?? null)} · falta darle salida` : 'Preparado · por salir'}</span>
               </div>
-              <EntregaPill e={ent} />
+              <EntregaPill e={ent} sinSalida />
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>Productos a empacar</div>

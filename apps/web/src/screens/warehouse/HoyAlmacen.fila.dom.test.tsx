@@ -41,6 +41,9 @@ describe('<HoyAlmacen> · la fila del día', () => {
     expect(screen.getByTestId('hoy-enviar-o2')).toHaveTextContent('Entregar al chofer')
     expect(screen.getByTestId('hoy-despachar-o3')).toHaveTextContent('Ya le entregué la carga: despachar')
     expect(within(screen.getByTestId('hoy-caso-o3')).getByTestId('hoy-paso')).toHaveTextContent(/falta darle salida/)
+    // el encabezado del grupo ya dice cuándo sale: la tarjeta no lo repite, pero conserva con quién va y la promesa
+    expect(within(screen.getByTestId('hoy-caso-o1')).queryByTestId('pedido-salida')).toBeNull()
+    expect(within(screen.getByTestId('hoy-caso-o1')).getByTestId('cola-entrega')).toHaveTextContent('DHL')
   })
 
   it('lo que espera a que el cliente lo recoja está en Inicio, con el nombre para tocarlo', () => {
