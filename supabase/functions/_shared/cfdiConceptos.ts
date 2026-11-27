@@ -11,6 +11,8 @@ export interface LineaFiscal {
   product_id: string; sku: string | null; nombre: string; qty: number; unit_price: number
   clave_prod_serv: string | null; clave_unidad: string | null; objeto_imp: string | null
   tratamiento_iva: string | null; iva_tasa: number | null; descripcion_fiscal: string | null; validado: boolean
+  /** Unidad comercial del producto (products.unit), p. ej. «Media caja/10 viales». La pone la Edge; ver `cantidadFiscal`. */
+  unidad_venta?: string | null
 }
 export interface ConceptoFiscal { clave_prod_serv: string | null; clave_unidad: string | null; objeto_imp: string | null; tratamiento_iva: string | null; iva_tasa: number | null; descripcion_fiscal: string | null; validado: boolean }
 export interface Preparado {
@@ -43,6 +45,14 @@ export function baseDesdeTotal(total: number, tasa: number): { base: number; iva
   }
   const base = r6(total / (1 + tasa)); const iva = r6(base * tasa)
   return Math.abs(base + iva - total) <= 1e-6 ? { base, iva } : null
+}
+
+/** CAJAS CON MEDIOS (27 nov 2026, contador: «este producto se vende en caja o media caja», unidad SAT = Caja).
+ *  Los ultrafiltrados se guardan por MEDIA caja (2 internas = 1 caja). Si su unidad SAT es Caja (XBX), la factura
+ *  lleva CAJAS: 2 internas → 1, 1 interna → 0.5. El importe de la línea no cambia; el precio unitario sale por caja.
+ *  Para cualquier otro producto o cualquier otra unidad SAT la cantidad queda igual. */
+export function cantidadFiscal(qty: number, claveUnidad: string | null | undefined, unidadVenta: string | null | undefined): number {
+  return claveUnidad === 'XBX' && /^media caja/i.test(unidadVenta ?? '') ? qty / 2 : qty
 }
 
 /** Un concepto de Facturama desde un total final y su configuración fiscal validada. */
@@ -87,7 +97,7 @@ export function armarConceptos(p: Preparado, formaElegida?: string | null): Arma
   if (GENERICO.test(p.receiver?.rfc ?? '')) falta.push('Factura a público en general aún no soportada: captura el RFC del cliente.')
   const items: ItemFacturama[] = []; let base = 0; let iva = 0
   for (const l of p.lineas) {
-    const c = concepto(l.nombre, l.sku, Number(l.qty), Number(l.qty) * Number(l.unit_price), l)
+    const c = concepto(l.nombre, l.sku, cantidadFiscal(Number(l.qty), l.clave_unidad, l.unidad_venta), Number(l.qty) * Number(l.unit_price), l)
     if (c.ok) { items.push(c.item); base += c.base; iva += c.iva } else falta.push(c.error)
   }
   if (Number(p.order.shipping_cost) > 0) {

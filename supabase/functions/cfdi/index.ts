@@ -55,7 +55,20 @@ Deno.serve(conCors(async (req) => {
   const configurado = ent.ok && !!user && !!pass
   const deps: DepsPAC | null = configurado && ent.ok ? { fetch, base: ent.base, auth: 'Basic ' + btoa(`${user}:${pass}`) } : null
 
-  const leer = async (): Promise<Preparado | null> => { const { data, error } = await caller.rpc('cfdi_preparar', { p_doc: doc }); return error ? null : data as Preparado }
+  // La unidad comercial de cada producto (p. ej. «Media caja/10 viales») acompaña a la línea: con ella la factura
+  // lleva CAJAS y no medias (cantidadFiscal). Si no se pudo leer, la línea queda como venía.
+  const leer = async (): Promise<Preparado | null> => {
+    const { data, error } = await caller.rpc('cfdi_preparar', { p_doc: doc })
+    if (error || !data) return null
+    const prep = data as Preparado
+    const ids = [...new Set((prep.lineas ?? []).map((l) => l.product_id).filter(Boolean))]
+    if (ids.length) {
+      const { data: prods } = await admin.from('products').select('id, unit').in('id', ids)
+      const unidad = new Map((prods ?? []).map((x: { id: string; unit: string | null }) => [x.id, x.unit]))
+      prep.lineas = prep.lineas.map((l) => ({ ...l, unidad_venta: unidad.get(l.product_id) ?? null }))
+    }
+    return prep
+  }
   const prep = await leer()
   if (!prep) return json(409, { error: 'preparar', message: 'No se pudo leer la solicitud de factura.' })
 
