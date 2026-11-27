@@ -137,16 +137,12 @@ export const ROLES: RoleDef[] = [
       { key: 'caja', label: 'Punto de venta', icon: 'store', section: 'Vender' },
       { key: 'links_pago', label: 'Cobrar pedidos', icon: 'receipt', section: 'Vender' },
       { key: 'mis_ventas', label: 'Mis ventas', icon: 'chart', section: 'Vender' },   // MIS VENTAS (23 nov 2026) · los pedidos detrás de "Vendido este mes" y "Por cobrar"   // LINK DE PAGO (2 nov 2026) · el cliente pide pagar con tarjeta; el vendedor pega el de BanBajío
-      // MENÚ ORDENADO (23 nov 2026): Mi cartera = clientes y su seguimiento; Herramientas = lo que usa para vender.
+      // MENÚ CORTO de Ventas (27 nov 2026, parte 3 de la auditoría del menú; «Mi cartera» llegó a tener 8 entradas): de 12
+      // entradas a 6. El seguimiento de la cartera y las herramientas para vender son DOS entradas con pestañas. Ninguna
+      // pantalla se quitó y las claves de siempre siguen abriendo su pestaña (resolverDestino).
       { key: 'clientes', label: 'Clientes', icon: 'usercheck', section: 'Mi cartera' },
-      { key: 'llamar_hoy', label: 'A quién llamar hoy', icon: 'phone', section: 'Mi cartera' },   // PROSPECCIÓN (15 nov 2026) · cartera histórica sin cuenta
-      { key: 'seguimientos', label: 'Pendientes', icon: 'clock', section: 'Mi cartera' },   // HERRAMIENTAS DEL VENDEDOR · seguimientos por retomar
-      { key: 'cartera_plazos', label: 'Por vencer', icon: 'clock', section: 'Mi cartera' },   // CARTERA-PLAZO (3 nov 2026) · 6 meses por cliente + competencia
-      { key: 'crm_embudo', label: 'Embudo de ventas', icon: 'chart', section: 'Mi cartera' },   // CRM (2 nov 2026) · Primer contacto → En seguimiento → Cotizado → Ganado
-      { key: 'productos_clientes', label: 'Productos', icon: 'grid', section: 'Herramientas' },   // HERRAMIENTAS DEL VENDEDOR · quién compró cada producto
-      { key: 'consigna', label: 'Mi inventario', icon: 'box', section: 'Herramientas' },
-      { key: 'difusiones', label: 'Difusiones', icon: 'megaphone', section: 'Herramientas' },   // HERRAMIENTAS DEL VENDEDOR · listas y difusiones
-      { key: 'av_promociones', label: 'Promociones', icon: 'megaphone', section: 'Herramientas' },   // REPARTO-TURNO (2 nov 2026) · promociones y flyers
+      { key: 'g_seg_ven', label: 'Seguimiento', icon: 'clock', section: 'Mi cartera' },     // A quién llamar hoy · Pendientes · Por vencer · Embudo de ventas
+      { key: 'g_herr_ven', label: 'Herramientas', icon: 'grid', section: 'Mi cartera' },    // Productos · Mi inventario · Difusiones · Promociones
     ],
   },
   {
@@ -212,7 +208,10 @@ export const SECCION_MAS = 'Más'
 const G_DISENO_MAS: ScreenDef = { ...G_DISENO, section: SECCION_MAS }
 const G_CATSITIO: ScreenDef = { key: 'g_catsitio', label: 'Catálogo y sitio', icon: 'bag', section: SECCION_MAS }
 const G_EVENTOS: ScreenDef = { key: 'g_eventos', label: 'Eventos', icon: 'store', section: SECCION_MAS }
+const G_EQUIPO_VEN: ScreenDef = { key: 'g_equipo_ven', label: 'Mi equipo', icon: 'chart', section: 'Mi cartera' }
 const GRUPO_DE_CAPACIDAD: Partial<Record<RoleKey, Record<string, ScreenDef>>> = {
+  // MENÚ CORTO de Ventas: lo del jefe de ventas es UNA entrada («Mi equipo») con sus dos pantallas como pestañas.
+  pos: { ventas_equipo: G_EQUIPO_VEN, av_comisiones: G_EQUIPO_VEN },
   admin: { dis_solicitudes: G_DISENO, dis_calendario: G_DISENO },
   // MENÚ CORTO de Almacén: cada responsabilidad extra es UNA entrada con pestañas, en «Más».
   warehouse: { dis_solicitudes: G_DISENO_MAS, dis_calendario: G_DISENO_MAS, av_catalogo: G_CATSITIO, av_sitio: G_CATSITIO, eventos: G_EVENTOS, caja: G_EVENTOS, vev: G_EVENTOS },
@@ -292,6 +291,10 @@ export const SUBPANTALLAS: Record<string, Array<{ key: string; label: string }>>
   g_catsitio: [{ key: 'av_catalogo', label: 'Catálogo' }, { key: 'av_sitio', label: 'Sitio web' }],
   g_eventos: [{ key: 'eventos', label: 'Eventos' }, { key: 'caja', label: 'Punto de venta' }, { key: 'vev', label: 'Ventas desde custodia' }],
   g_inv_aux: [{ key: 'stock', label: 'Existencias' }, { key: 'caduc', label: 'Por caducar' }],   // Auxiliar (Blanca)
+  // MENÚ CORTO de Ventas (27 nov 2026)
+  g_seg_ven: [{ key: 'llamar_hoy', label: 'A quién llamar hoy' }, { key: 'seguimientos', label: 'Pendientes' }, { key: 'cartera_plazos', label: 'Por vencer' }, { key: 'crm_embudo', label: 'Embudo de ventas' }],
+  g_herr_ven: [{ key: 'productos_clientes', label: 'Productos' }, { key: 'consigna', label: 'Mi inventario' }, { key: 'difusiones', label: 'Difusiones' }, { key: 'av_promociones', label: 'Promociones' }],
+  g_equipo_ven: [{ key: 'ventas_equipo', label: 'Ventas del equipo' }, { key: 'av_comisiones', label: 'Metas y comisiones' }],   // jefe de ventas
   g_pedidos_aux: [{ key: 'surtido', label: 'Preparar' }, { key: 'cola', label: 'Por enviar' }, { key: 'despacho', label: 'Despacho' }, { key: 'para_recoger', label: 'Para recoger' }, { key: 'agenda_entregas', label: 'Horarios' }],   // Auxiliar (Blanca): mismas pestañas que Alberto
   g_pedidosdr: [{ key: 'pedidosdr', label: 'En curso' }, { key: 'hist', label: 'Historial' }],   // portal del doctor
 }
