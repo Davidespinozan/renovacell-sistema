@@ -480,3 +480,15 @@ button.cifra-v{cursor:pointer}
 
 /* POR CONFIRMAR (26 nov 2026) · contador de pedidos por confirmar junto a «Cobrar pedidos» en el menú */
 .nav a .nav-n{margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--ds-danger);color:var(--ds-on-ink);font:700 11px/18px var(--ds-font);text-align:center}
+
+/* BUSCADOR EN EL CELULAR (27 nov 2026) · la lupa abre la caja de búsqueda bajo la barra de arriba; en computadora no cambia. */
+.top-buscar-movil{display:none}
+@media (max-width:900px){
+  .top .top-buscar-movil{display:grid;place-items:center}
+  .top .top-busca--abierta .searchbox{display:flex;position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 70px);z-index:70;min-height:48px;width:auto;max-width:none;background:var(--ux-surface);border:1px solid var(--ux-line);box-shadow:var(--ux-shadow-pop)}
+  .top .top-busca--abierta .searchbox input{font-size:16px}
+  .top .top-busca--abierta .kbd-hint{display:none}
+  .top .top-busca--abierta .searchpop{position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 124px);width:auto;max-width:none;max-height:60vh;overflow:auto;z-index:70}
+  .top .top-busca--abierta .searchbox input{outline:none}
+  .top .top-busca--abierta .searchbox:focus-within{border-color:var(--ux-accent)}
+}

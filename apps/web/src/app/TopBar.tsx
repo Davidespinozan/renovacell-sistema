@@ -1,6 +1,7 @@
 // Barra superior del hub: hamburguesa (móvil), título/subtítulo de la pantalla,
 // buscador GLOBAL (indexado, acotado por rol) y campana.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { pedirFiltro } from '../data/store/filtroInicial'
 import { Sparkles } from 'lucide-react'
 import { ROLES_EQUIPO, abrirAsistente } from './AsistenteEquipo'
 import { Icon } from './icons'
@@ -46,7 +47,11 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const results = useMemo(() => (open ? search(q) : []), [open, q, search])
 
-  const go = (toScreen: string) => { setScreen(toScreen); setQ(''); setOpen(false); inputRef.current?.blur() }
+  // BUSCADOR EN EL CELULAR (27 nov 2026): la caja estaba oculta en el teléfono; ahora una lupa la abre bajo la barra.
+  const [buscando, setBuscando] = useState(false)
+  const go = (toScreen: string) => { setScreen(toScreen); setQ(''); setOpen(false); setBuscando(false); inputRef.current?.blur() }
+  // Un pedido encontrado abre ESE pedido (antes dejaba en la lista de Ventas, sin decir cuál era).
+  const abrir = (r: { type: string; id: string; screen: string }) => { if (r.type === 'Pedido' && r.screen === 'av_ventas') pedirFiltro('av_ventas', 'pedido:' + r.id); go(r.screen) }
 
   // Atajo global ⌘K / Ctrl+K: enfoca el buscador desde cualquier pantalla.
   useEffect(() => {
@@ -68,8 +73,8 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
   const onInputKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(a + 1, results.length - 1)) }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)) }
-    else if (e.key === 'Enter') { const r = results[active]; if (r) go(r.screen) }
-    else if (e.key === 'Escape') { setOpen(false); inputRef.current?.blur() }
+    else if (e.key === 'Enter') { const r = results[active]; if (r) abrir(r) }
+    else if (e.key === 'Escape') { setOpen(false); setBuscando(false); inputRef.current?.blur() }
   }
 
   return (
@@ -86,7 +91,8 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
           de la pantalla es el <h1>. */}
       <span className="top-logo" aria-hidden="true"><BrandLogo alt="" /></span>
       <div className="top-r">
-        <div style={{ position: 'relative' }}>
+        <button type="button" className="icobtn top-buscar-movil" aria-label="Buscar" aria-expanded={buscando} onClick={() => { setBuscando(true); setOpen(true); window.setTimeout(() => inputRef.current?.focus(), 0) }} data-testid="top-buscar-movil"><Icon name="search" /></button>
+        <div className={'top-busca' + (buscando ? ' top-busca--abierta' : '')} style={{ position: 'relative' }}>
           <div className="searchbox">
             <Icon name="search" />
             <input
@@ -97,7 +103,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
               onChange={(e) => { setQ(e.target.value); setOpen(true); setActive(0) }}
               onFocus={() => setOpen(true)}
               onKeyDown={onInputKey}
-              onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+              onBlur={() => window.setTimeout(() => { setOpen(false); setBuscando(false) }, 150)}
             />
             {!esDoctor && <kbd className="kbd-hint" aria-hidden="true">⌘K</kbd>}
           </div>
@@ -112,7 +118,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
                     type="button"
                     className={'searchpop-row' + (i === active ? ' active' : '')}
                     onMouseEnter={() => setActive(i)}
-                    onMouseDown={() => go(res.screen)}
+                    onMouseDown={() => abrir(res)}
                   >
                     <span className="searchpop-type">{res.type}</span>
                     <span className="searchpop-label">{res.label}</span>

@@ -3,7 +3,7 @@
 // Agrega de useAllOrders + useProducts + useDoctors vía data/metrics. Migrable a
 // un select sobre Supabase sin tocar la pantalla.
 import { orderClientName } from '../../data/ops/orderClient'
-import { tomarFiltro } from '../../data/store/filtroInicial'
+import { escucharFiltro, tomarFiltro, verFiltro } from '../../data/store/filtroInicial'
 import { capitalizarNombre } from '../../lib/nombres'
 import { avisar, pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
 import { Vacio, Cargando, CargandoKpis } from '../../app/EmptyState'
@@ -101,7 +101,10 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
   // fecha dos veces. Los botones de periodo llenan las fechas; escribir una fecha a mano deja el periodo en «otras fechas».
   // Llegada desde un pendiente de Inicio (cancelación, reembolso, pago de más): la venta puede ser de otro día, así
   // que abre en «Todo». Al entrar por el menú abre en «Hoy».
-  const [inicial] = useState<PeriodoRapido>(() => (tomarFiltro('av_ventas') === 'todo' ? 'todo' : 'hoy'))
+  // También llega así un pedido encontrado en el buscador de arriba («pedido:<id>»): se abre ESA venta.
+  const [llegada] = useState(() => (fuente ? null : verFiltro('av_ventas')))
+  useEffect(() => { if (!fuente) tomarFiltro('av_ventas') }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+  const [inicial] = useState<PeriodoRapido>(() => (llegada ? 'todo' : 'hoy'))
   const [periodo, setPeriodo] = useState<PeriodoRapido | 'otro'>(inicial)
   const [from, setFrom] = useState(() => rangoPeriodo(inicial, hoyNegocio()).from)
   const [to, setTo] = useState(() => rangoPeriodo(inicial, hoyNegocio()).to)
@@ -114,7 +117,9 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
   const conSeguimiento = true
   const [etapa, setEtapa] = useState<'todos' | EtapaSeguimiento>('todos')
   const [q, setQ] = useState('')
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(() => (llegada?.startsWith('pedido:') ? llegada.slice(7) : null))
+  // Si Ventas ya está abierta y se busca otro pedido, llega aquí al momento.
+  useEffect(() => (fuente ? undefined : escucharFiltro('av_ventas', (f) => { elegirPeriodo('todo'); if (f.startsWith('pedido:')) setSelected(f.slice(7)) })), [])   // eslint-disable-line react-hooks/exhaustive-deps
   // PAY-EXP-01A-3 · "Abrir pedido en Ventas" desde Revisión económica: abre su detalle (reembolsos canónicos) si el
   // pedido está en la lista de este usuario; se consume una sola vez.
   const intento = useIntentoVentas()
@@ -300,7 +305,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
       </div>
 
       {selectedOrder && (
-        <SaleDetail avisoRepetida={avisoRef(selectedOrder.id)} order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} channel={channelOf(selectedOrder)} dinero={byOrder[selectedOrder.id] ?? null} onClose={() => setSelected(null)} onCancel={() => setCancelling(selectedOrder)} soloLectura={soloLectura} />
+        <SaleDetail avisoRepetida={avisoRef(selectedOrder.id)} order={selectedOrder} productsById={productsById} clientName={capitalizarNombre(clientName(selectedOrder)) || clientName(selectedOrder)} channel={channelOf(selectedOrder)} dinero={byOrder[selectedOrder.id] ?? null} onClose={() => setSelected(null)} onCancel={() => setCancelling(selectedOrder)} soloLectura={soloLectura} />
       )}
       {cancelling && (
         <CancelOrderModal orderId={cancelling.id} folio={cancelling.external_ref ?? cancelling.id} requireReason actor="Administración"
