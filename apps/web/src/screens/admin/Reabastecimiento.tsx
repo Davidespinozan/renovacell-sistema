@@ -5,7 +5,7 @@
 //  4) La compra queda parcial o completa. Pagarla es un hecho de dinero aparte.
 // La orden nace por el comando idempotente `crear_orden_compra` (un doble clic no duplica).
 import { GuiaInventario } from '../../app/GuiaInventario'
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { ShoppingCart, PackageCheck, AlertTriangle, X, Factory, Check, DollarSign } from 'lucide-react'
 import { fmtDate } from '../../lib/format'
 import { PageHead } from '../../app/PageHead'
@@ -15,6 +15,9 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { useCompras, type PurchaseOrder, type ReplenKind } from '../../data/hooks/useCompras'
 import { stockByProduct, nivelDe, sugeridoDeCompra, errorDeNivel, REORDER_THRESHOLD, IDEAL_POR_DEFECTO, type NivelStock } from '../../data/ops/stock'
 import { useNivelesStock, guardarNivel } from '../../data/store/nivelesStockStore'
+import { FORMAS_PAGO_PROVEEDOR, faltaEnPago, leerPagosProveedor, pideCuenta, pideReferencia, registrarPagoProveedor, resumenPago, type CapturaPago, type PagoProveedor } from '../../data/ops/pagosProveedor'   // PAGO A PROVEEDOR CON DATOS (27 nov 2026)
+import { useBankAccounts } from '../../data/hooks/useBankAccounts'
+import { hoyNegocio } from '../../data/periodo'
 import { costOf } from '../../data/mock/costs'
 import { hasSupabase } from '../../lib/supabase'
 import { useRole } from '../../auth/RoleContext'
@@ -34,11 +37,22 @@ import { reloadCompras } from '../../data/store/comprasStore'
 export function Reabastecimiento() {
   const { data: lots } = useLots()
   const { data: products } = useProducts()
-  const { data: pos, createReplenishment, markPaid } = useCompras()
+  const { data: pos, createReplenishment, reloadCompras: recargarCompras } = useCompras()
+  // PAGO A PROVEEDOR: «Marcar pagado» ahora abre la captura (forma, cuenta, referencia, fecha); cada compra pagada dice cómo.
+  const [pagando, setPagando] = useState<PurchaseOrder | null>(null)
+  const [pagos, setPagos] = useState<Record<string, PagoProveedor>>({})
+  const idsPagadas = pos.filter((o) => o.paid).map((o) => o.id).join(',')
+  useEffect(() => {
+    if (!puedeComprarPago) return
+    let vivo = true
+    void leerPagosProveedor(idsPagadas ? idsPagadas.split(',') : []).then((l) => { if (vivo) setPagos(Object.fromEntries(l.map((p) => [p.compra, p]))) })
+    return () => { vivo = false }
+  }, [idsPagadas])   // eslint-disable-line react-hooks/exhaustive-deps
   const { role } = useRole()
   const isAdmin = role === 'admin'
   // Misma autoridad que el servidor (comando + RLS): Dirección y Facturación crean compras y registran el pago.
   const puedeComprar = PUEDE_MARCAR_PAGADO(role)
+  const puedeComprarPago = puedeComprar
   const [receiving, setReceiving] = useState<PurchaseOrder | null>(null)
   const [replen, setReplen] = useState<{ product: ProductSafe; suggested: number; existencia: number; nivel: NivelStock; enCamino: number } | null>(null)
   const niveles = useNivelesStock()
@@ -238,9 +252,10 @@ export function Reabastecimiento() {
                       )}
                       {o.kind === 'compra' && !o.paid && puedeComprar && (
                         <button className="btn ghost sm" type="button" title="Registrar el pago al proveedor (independiente de la recepción)" data-testid="btn-pagado"
-                          onClick={async () => { const r = await markPaid(o.id); toast(r.ok, r.ok ? 'Compra marcada como pagada.' : r.error ?? 'No se marcó como pagada.') }}><DollarSign size={13} /> Marcar pagado</button>
+                          onClick={() => setPagando(o)}><DollarSign size={13} /> Registrar pago</button>
                       )}
-                      {o.kind === 'compra' && o.paid && <span className="pill p-ok" style={{ fontSize: 10.5 }}>Pagada</span>}
+                      {o.kind === 'compra' && o.paid && <span className="pill p-ok" style={{ fontSize: 10.5 }} title={pagos[o.id] ? resumenPago(pagos[o.id]) : undefined}>Pagada</span>}
+                      {o.kind === 'compra' && o.paid && pagos[o.id] && <span className="ms" style={{ fontSize: 11.5, color: 'var(--ink-3)', flexBasis: '100%' }} data-testid="pago-resumen">{resumenPago(pagos[o.id])}</span>}
                     </span>
                   </td>
                 </tr>
@@ -269,6 +284,15 @@ export function Reabastecimiento() {
               : 'Producción registrada: queda pendiente de recibir. Entrará al inventario al recibirla como lote.')
             return true
           }}
+        />
+      )}
+
+      {pagando && (
+        <PagoProveedorModal
+          compra={pagando}
+          producto={prodById[pagando.product_id]}
+          onClose={() => setPagando(null)}
+          onHecho={() => { const id = pagando.id; setPagando(null); toast(true, 'Pago registrado con sus datos. La compra quedó pagada.'); recargarCompras(); void leerPagosProveedor([id]).then((l) => setPagos((p) => ({ ...p, ...Object.fromEntries(l.map((x) => [x.compra, x])) }))) }}
         />
       )}
 
@@ -432,6 +456,70 @@ function NivelesModal({ product, nivel, existencia, onClose, onHecho }: {
             {nivel.propio && <button className="btn ghost" type="button" disabled={busy} onClick={() => void guardar(null)} data-testid="niveles-general" style={{ marginRight: 'auto' }}>Usar el nivel general ({REORDER_THRESHOLD} y {IDEAL_POR_DEFECTO})</button>}
             <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
             <button className="btn" type="button" disabled={!!invalido || busy} style={invalido || busy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => void guardar({ minimo: m, ideal: i })} data-testid="niveles-guardar">{busy ? 'Guardando…' : 'Guardar niveles'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// PAGO A PROVEEDOR · cómo se pagó, de qué cuenta, a qué banco, con qué referencia y cuándo. El monto es el de la compra.
+function PagoProveedorModal({ compra, producto, onClose, onHecho }: { compra: PurchaseOrder; producto?: ProductSafe; onClose: () => void; onHecho: () => void }) {
+  const { data: cuentas } = useBankAccounts()
+  const activas = cuentas.filter((c) => c.active)
+  const hoy = hoyNegocio()
+  const [c, setC] = useState<CapturaPago>({ forma: '', cuentaId: activas.find((x) => x.is_default)?.id ?? '', fecha: hoy, referencia: '', bancoProveedor: '', notas: '' })
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const set = (p: Partial<CapturaPago>) => { setC((x) => ({ ...x, ...p })); setErr(null) }
+  const falta = faltaEnPago(c, hoy)
+  const monto = compra.qty * compra.unit_cost
+  const guardar = async () => {
+    if (falta || busy) { setErr(falta); return }
+    setBusy(true)
+    const r = await registrarPagoProveedor(compra.id, c)
+    setBusy(false)
+    if (!r.ok) { setErr(r.error); return }
+    onHecho()
+  }
+  const ult = (x: { clabe: string | null; account_number: string | null }) => (x.clabe || x.account_number || '').slice(-4)
+  return (
+    <div className="overlay" onClick={busy ? undefined : onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="pago-modal">
+        <div className="mhead">
+          <div><h3>Registrar pago a proveedor</h3><div className="ms">{compra.supplier ?? 'Proveedor'} · {compra.product_name} · {cantidadVista(producto, compra.qty, 'u')}</div></div>
+          <button className="mclose" type="button" aria-label="Cerrar" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="mbody">
+          <div className="sysnote"><span>Monto de la compra: <b className="mono" data-testid="pago-monto">${monto.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></span></div>
+          <label style={lbl}>¿Cómo se pagó?</label>
+          <div className="seg" style={{ marginTop: 8, flexWrap: 'wrap' }} role="group" aria-label="Forma de pago">
+            {FORMAS_PAGO_PROVEEDOR.map((f) => <button key={f.key} type="button" className={c.forma === f.key ? 'active' : undefined} aria-pressed={c.forma === f.key} onClick={() => set({ forma: f.key })} data-testid={`pago-forma-${f.key}`}>{f.label}</button>)}
+          </div>
+          {c.forma && (pideCuenta(c.forma) || c.forma === 'otro') && <>
+            <label style={lbl}>¿De qué cuenta de la empresa salió?{pideCuenta(c.forma) ? '' : ' (opcional)'}</label>
+            <select style={fld} value={c.cuentaId} onChange={(e) => set({ cuentaId: e.target.value })} aria-label="Cuenta de la empresa" data-testid="pago-cuenta">
+              <option value="">Elige la cuenta…</option>
+              {activas.map((x) => <option key={x.id} value={x.id}>{x.bank_name} · terminación {ult(x)}{x.is_default ? ' (principal)' : ''}</option>)}
+            </select>
+            {activas.length === 0 && <div className="ms" style={{ color: 'var(--warn)', marginTop: 4 }}>No hay cuentas bancarias registradas: agrégalas en Configuración.</div>}
+          </>}
+          {c.forma && c.forma !== 'efectivo' && <>
+            <label style={lbl}>Banco del proveedor (opcional)</label>
+            <input style={fld} value={c.bancoProveedor} maxLength={120} onChange={(e) => set({ bancoProveedor: e.target.value })} placeholder="Ej. BBVA" aria-label="Banco del proveedor" />
+          </>}
+          {c.forma && <>
+            <label style={lbl}>{c.forma === 'cheque' ? 'Número de cheque' : c.forma === 'transferencia' ? 'Referencia o folio de la transferencia' : 'Referencia (opcional)'}</label>
+            <input style={fld} value={c.referencia} maxLength={120} onChange={(e) => set({ referencia: e.target.value })} placeholder={c.forma === 'transferencia' ? 'Clave de rastreo o folio SPEI' : ''} aria-label="Referencia" data-testid="pago-referencia" />
+          </>}
+          <div className="form-grid-2">
+            <div><label style={lbl}>Fecha del pago</label><input style={fld} type="date" max={hoy} value={c.fecha} onChange={(e) => set({ fecha: e.target.value })} aria-label="Fecha del pago" /></div>
+            <div><label style={lbl}>Notas (opcional)</label><input style={fld} value={c.notas} maxLength={500} onChange={(e) => set({ notas: e.target.value })} aria-label="Notas" /></div>
+          </div>
+          {err && <div className="sysnote" role="alert" style={{ marginTop: 12, background: 'var(--danger-bg)', borderColor: 'var(--danger-line)', color: 'var(--danger)' }} data-testid="pago-error"><span>{err}</span></div>}
+          <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+            <button className="btn ghost" type="button" onClick={onClose}>Cancelar</button>
+            <button className="btn" type="button" disabled={busy || !!falta} style={busy || falta ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => void guardar()} data-testid="pago-guardar">{busy ? 'Registrando…' : 'Registrar pago'}</button>
           </div>
         </div>
       </div>
