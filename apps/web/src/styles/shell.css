@@ -105,8 +105,16 @@ td,.num,.sig .v,.barrow .amt,.poscard .pr,.pcard .pr,.tket-total b,.cototal b,.r
 .brand .bs{font-size:8.5px;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.72);font-weight:600;margin-top:4px}
 /* Scroll del menú SIN barra visible (se veía una franja blanca fea sobre el
    sidebar oscuro). Sigue siendo scroll natural con rueda/trackpad/dedo. */
-.nav{display:flex;flex-direction:column;gap:2px;padding:0 13px;flex:1;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;overscroll-behavior:contain}
-.nav::-webkit-scrollbar{width:0;height:0;display:none}
+.nav{display:flex;flex-direction:column;gap:2px;padding:0 13px;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:auto;scrollbar-color:auto}   /* anula la regla global `*{scrollbar-width:thin}` para que valga ::-webkit-scrollbar */
+/* SCROLL VISIBLE en el menú verde (27 nov 2026, dueño: «pon un scroll en la parte verde del menú del desktop»): antes la
+   barra estaba oculta y no se notaba que había más opciones abajo. Delgada y clara, para no romper el verde. */
+.nav::-webkit-scrollbar{width:8px}
+.nav::-webkit-scrollbar-track{background:transparent}
+.nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.34);border-radius:8px;border:2px solid transparent;background-clip:padding-box}
+.nav::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.5);background-clip:padding-box}
+/* Chrome y Safari: con ::-webkit-scrollbar la barra queda SIEMPRE visible (con `scrollbar-width` Chrome la vuelve
+   «superpuesta» en Mac y no se ve hasta que se mueve). Firefox no tiene ::-webkit-scrollbar: usa la forma estándar. */
+@supports not selector(::-webkit-scrollbar){.nav{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.3) transparent}}
 .nav .grp{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);padding:14px 11px 8px;font-weight:600}
 .nav .grp-btn{display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:0;border-radius:var(--r-sm);cursor:pointer;font:inherit;font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:rgba(255,255,255,.4);text-align:left;transition:.16s}
 .nav .grp-btn:hover{color:rgba(255,255,255,.75);background:rgba(255,255,255,.05)}
