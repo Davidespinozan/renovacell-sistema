@@ -159,6 +159,12 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
 
   return (
     <div className="grid" style={{ gap: 16 }}>
+      <div className="vd-periodos" role="group" aria-label="Periodo" data-testid="vd-periodos">
+        {([['hoy', 'Hoy'], ['ayer', 'Ayer'], ['semana', 'Esta semana'], ['mes', 'Este mes'], ['todo', 'Todo']] as Array<[PeriodoRapido, string]>).map(([k, t]) => (
+          <button key={k} type="button" className={'fchip' + (periodo === k ? ' on' : '')} aria-pressed={periodo === k} onClick={() => elegirPeriodo(k)} data-testid={`vd-periodo-${k}`}>{t}</button>
+        ))}
+        {periodo === 'otro' && <span className="vd-periodo-otro">Otras fechas</span>}
+      </div>
       {/* Agregados del periodo filtrado */}
       <div className="grid sigs">
         <Stat icon={<TrendingUp size={18} />} v={money(sum.revenue)} k="Total vendido" s={`${sum.orders} ventas`} />
@@ -168,12 +174,6 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
         <Stat icon={<Receipt size={18} />} v={prods[0]?.name ?? '—'} k="Top producto" s={prods[0] ? money(prods[0].revenue) : ''} />
       </div>
 
-      <div className="vd-periodos" role="group" aria-label="Periodo" data-testid="vd-periodos">
-        {([['hoy', 'Hoy'], ['ayer', 'Ayer'], ['semana', 'Esta semana'], ['mes', 'Este mes'], ['todo', 'Todo']] as Array<[PeriodoRapido, string]>).map(([k, t]) => (
-          <button key={k} type="button" className={'fchip' + (periodo === k ? ' on' : '')} aria-pressed={periodo === k} onClick={() => elegirPeriodo(k)} data-testid={`vd-periodo-${k}`}>{t}</button>
-        ))}
-        {periodo === 'otro' && <span className="vd-periodo-otro">Otras fechas</span>}
-      </div>
       {/* Filtros */}
       <div className="card filters">
         <div className="searchbox">
@@ -288,7 +288,7 @@ export function VentasDetalle({ fuente, soloLectura = false }: { fuente?: { orde
                   </tr>
                 )
               })}
-              {rows.length === 0 && <tr><td colSpan={conSeguimiento ? 11 : 10} style={{ color: 'var(--ink-3)' }}>Sin ventas con esos filtros.</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={conSeguimiento ? 11 : 10} style={{ color: 'var(--ink-3)' }} data-testid="vd-vacio">{periodo === 'hoy' ? 'Todavía no hay ventas hoy con esos filtros. Mira ayer o esta semana con los botones de arriba.' : 'Sin ventas con esos filtros.'}</td></tr>}
             </tbody>
           </table>
         </div>
