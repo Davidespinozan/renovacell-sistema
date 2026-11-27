@@ -417,6 +417,22 @@ button.cifra-v{cursor:pointer}
 /* BLOQUE1 · efectivo que trae el chofer: resalta si hay que entregarlo */
 .mi-efectivo-pend { border-left: 4px solid var(--ds-warning); }
 
+/* AVISOS AL CLIENTE dentro de la venta (app/AvisosDelPedido.tsx) */
+.avisos-pedido { display: grid; gap: 6px; margin-bottom: 14px; }
+.avisos-pedido-cab { font-size: var(--fs-sm, 13.5px); }
+.avisos-pedido-nota { color: var(--ux-ink-2, var(--ink-2)); font-size: var(--fs-sm, 13.5px); }
+.avisos-pedido-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.avisos-pedido-fila { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; font-size: var(--fs-sm, 13.5px); line-height: 1.45; }
+.avisos-pedido-fila svg { width: 14px; height: 14px; align-self: center; color: var(--ux-ink-3, var(--ink-3)); }
+.avisos-pedido-que { min-width: 0; color: var(--ux-ink-2, var(--ink-2)); }
+.avisos-pedido-que b { color: var(--ink); font-weight: 600; }
+.avisos-pedido-estado { color: var(--green-deep); white-space: nowrap; }
+.avisos-pedido-fila--espera .avisos-pedido-estado { color: var(--ux-ink-3, var(--ink-3)); }
+.avisos-pedido-fila--no .avisos-pedido-estado { color: var(--warn); white-space: normal; }
+@media (max-width: 640px) {
+  .avisos-pedido-fila { grid-template-columns: 16px minmax(0, 1fr); }
+  .avisos-pedido-estado { grid-column: 2; white-space: normal; }
+}
 /* QUÉ ES ESTA PANTALLA · una frase siempre a la vista + el detalle que se oculta (app/QueEs.tsx) */
 .quees { border: 1px solid var(--line); border-radius: var(--r-ui, 14px); background: var(--st-neu-bg); padding: 12px 14px; display: grid; gap: 10px; min-width: 0; }
 .quees-cab { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 10px; }

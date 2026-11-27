@@ -34,6 +34,7 @@ import { esRecoge } from '../../data/ops/seguimiento'
 import { ExportButton } from '../../app/ExportButton'
 import { CancelOrderModal } from '../../app/CancelOrderModal'
 import { BotonNotaVenta } from '../../app/NotaVenta'
+import { AvisosDelPedido } from '../../app/AvisosDelPedido'   // AVISOS AL CLIENTE, a la vista (27 nov 2026)
 import { GuiaManualVoid } from './GuiaManualVoid'
 import type { ProductSafe, Profile } from '../../data/types'
 import { enPeriodo, hoyNegocio, rangoPeriodo, type PeriodoRapido } from '../../data/periodo'
@@ -444,6 +445,7 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
           <EntregaDeLaVenta order={order} />
           {avisoRepetida && <div className="sysnote" style={{ marginBottom: 14, color: 'var(--warn, #b54708)' }} data-testid="venta-detalle-ref-repetida"><b>Referencia repetida:</b> {avisoRepetida}. Revisa que no sea el mismo pago registrado dos veces.</div>}
           {seguimientoDe(order) && <SeguimientoDeLaVenta order={order} />}
+          <AvisosDelPedido orderId={order.id} />
 
           {dinero && (
             <div className="sysnote" style={{ marginBottom: 14 }}>

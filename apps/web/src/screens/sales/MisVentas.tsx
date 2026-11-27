@@ -4,6 +4,7 @@
 // "por cobrar" = sin pagar ni reembolsar. Tocar un pedido muestra sus productos.
 import React, { useMemo, useState } from 'react'
 import { BotonNotaVenta } from '../../app/NotaVenta'
+import { AvisosDelPedido } from '../../app/AvisosDelPedido'
 import { capitalizarNombre } from '../../lib/nombres'
 import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
 import { useProducts } from '../../data/hooks/useProducts'
@@ -118,6 +119,7 @@ export function MisVentas() {
                           <div style={{ display: 'grid', gap: 4, padding: '4px 0 8px', fontSize: 13 }}>
                             {/* NOTA DE VENTA: el comprobante para el cliente, con el QR para pedir su factura */}
                             <div style={{ justifySelf: 'start', marginBottom: 4 }}><BotonNotaVenta order={o} /></div>
+                            <AvisosDelPedido orderId={o.id} />
                             {o.items.map((it) => (
                               <div key={it.id} style={{ display: 'flex', gap: 8 }}>
                                 <span style={{ flex: 1 }}>{(it.product_id && nombreProducto[it.product_id]) || 'Producto'}</span>
