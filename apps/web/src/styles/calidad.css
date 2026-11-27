@@ -152,6 +152,16 @@ div:has(> .eyebrow.crumb):not(:has(> :not(svg):not(.eyebrow.crumb):not(.pill))){
 .main label[style*="text-transform: uppercase"],.main div[style*="text-transform: uppercase"],.main span[style*="text-transform: uppercase"]{text-transform:none !important;letter-spacing:0 !important;font-size:12.5px !important;color:var(--ink-3) !important;font-weight:600 !important}
 
 /* ── Chofer: tarjeta de parada pensada para una mano ── */
+/* Chofer · una parada a la vez: la abierta arriba y las demás en renglones que se tocan */
+.parada-turno{font-size:12.5px;font-weight:600;color:var(--green-deep);margin-bottom:8px}
+.ruta-abrir{all:unset;box-sizing:border-box;flex:1;min-width:0;display:grid;gap:2px;justify-items:start;cursor:pointer;padding:4px 2px;border-radius:8px}
+.ruta-abrir:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.ruta-nombre{font-size:14px;font-weight:600;line-height:1.25;color:var(--ink);max-width:100%;overflow-wrap:anywhere}
+.ruta-cab{flex-wrap:wrap;row-gap:2px}
+.ruta-cab .ruta-pista{flex:1 1 100%;margin-left:0 !important}
+.ruta-dir{font-size:12px;color:var(--ink-3);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ruta-abrir .pill{margin-top:2px}
+.ruta-fila--abierta{background:var(--ok-bg);border-radius:10px}
 .parada{display:grid;gap:6px;margin-bottom:12px}
 .parada-cliente{font-size:17px;font-weight:700;color:var(--ink);line-height:1.25}
 .parada-cliente small{display:block;font-size:13.5px;font-weight:500;color:var(--ink-3)}

@@ -23,6 +23,7 @@ import { driverIdByEmail, driverName } from '../../data/mock/shipments'
 import { clienteDePedido, deliveryOf } from '../../data/mock/profiles'
 import { useRole } from '../../auth/RoleContext'
 import { cantidadVista } from '../../lib/cajas'
+import { capitalizarNombre } from '../../lib/nombres'
 import { cargaPorConfirmar, confirmarTodaLaCarga, nombreSugerido, tomarParada } from '../../data/ops/rutaChofer'   // CHOFER · menos pasos
 
 const INCIDENT_TYPES = ['Cliente ausente', 'Dirección incorrecta', 'Pedido rechazado', 'No se pudo contactar', 'Otro']
@@ -157,6 +158,19 @@ export function MisEntregas() {
     paradaDestino.current = null
     el.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
   }, [orderedMine.length])
+  // UNA PARADA A LA VEZ (27 nov 2026, «sistema sencillo por rol»): antes cada parada era una tarjeta larga y con seis
+  // paradas había que recorrer toda la pantalla. Ahora se trabaja UNA —la siguiente de su orden, o la que toque en la
+  // lista— y las demás quedan en renglones cortos debajo. Cada parada conserva todo lo suyo; solo se abre de una en una.
+  // El dueño viendo todas las rutas conserva la vista completa.
+  const unaALaVez = !comoDueno
+  const [abierta, setAbierta] = useState<string | null>(() => paradaDestino.current)
+  const actual = unaALaVez ? (orderedMine.find((x) => x.id === abierta) ?? orderedMine[0] ?? null) : null
+  const abrirParada = (id: string) => {
+    setAbierta(id)
+    setTimeout(() => document.getElementById(`parada-${id}`)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }), 0)
+  }
+  const estadoParada = (x: (typeof mine)[number]): { texto: string; pill: string } =>
+    x.incident && !x.incident.resolved ? { texto: 'Incidencia', pill: 'p-dang' } : x.status === 'por_despachar' ? { texto: 'Por despachar', pill: 'p-neu' } : x.status === 'despachado' ? { texto: 'Confirma tu carga', pill: 'p-warn' } : { texto: 'En reparto', pill: 'p-blue' }
   const persistOrder = (seq: string[]) => {
     setRouteOrder(seq)
     try { localStorage.setItem(KEY, JSON.stringify(seq)) } catch { /* almacenamiento no disponible */ }
@@ -239,6 +253,50 @@ export function MisEntregas() {
     avisar(r.ok, r.ok ? `Entrega confirmada: ${folio}` : `La entrega de ${folio} NO quedó registrada. ${r.error}`)
   }
 
+  const listaOrden = orderedMine.length > 1 ? (
+        <div className="card" style={{ padding: 0 }}>
+          <div className={unaALaVez ? 'ruta-cab' : undefined} style={{ padding: '14px 16px 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="eyebrow" style={{ margin: 0 }}>{unaALaVez ? `Tu ruta · ${orderedMine.length} paradas` : 'Orden de tu ruta'}</div>
+            <span className={unaALaVez ? 'ruta-pista' : undefined} style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{unaALaVez ? 'Toca una parada para abrirla. Las flechas cambian el orden.' : 'Acomódalas como te convenga · se guarda'}</span>
+          </div>
+          <div style={{ padding: '0 10px 10px' }}>
+            {orderedMine.map((s, i) => {
+              const info = stopInfo(s)
+              if (!info) return null
+              return (
+                <div key={s.id} className={'ruta-fila' + (actual?.id === s.id ? ' ruta-fila--abierta' : '')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 6px', borderBottom: i < orderedMine.length - 1 ? '1px solid var(--line)' : 'none' }} data-testid="ruta-fila">
+                  <span className="mono" style={{ width: 22, height: 22, borderRadius: 7, background: 'var(--green-deep)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flex: 'none' }}>{i + 1}</span>
+                  {unaALaVez ? (
+                    <button type="button" className="ruta-abrir" aria-pressed={actual?.id === s.id} onClick={() => abrirParada(s.id)} data-testid={`ruta-abrir-${s.id}`}>
+                      <span className="ruta-nombre">{capitalizarNombre(info.name) || info.name}</span>
+                      <span className="ruta-dir">{info.addr}</span>
+                      <span className={'pill ' + estadoParada(s).pill}>{actual?.id === s.id ? 'Abierta arriba' : estadoParada(s).texto}</span>
+                    </button>
+                  ) : (
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{info.name}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{info.addr}</div>
+                  </div>
+                  )}
+                  {(() => {
+                    const first = i === 0, last = i === orderedMine.length - 1
+                    const b: React.CSSProperties = { minWidth: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, padding: 0 }
+                    return (
+                      <div style={{ display: 'flex', gap: 4, flex: 'none' }}>
+                        <button type="button" className="btn ghost sm" aria-label="Mover al inicio" title="Al inicio" disabled={first} style={{ ...b, ...(first ? { opacity: 0.3 } : {}) }} onClick={() => moveEnd(s.id, 'top')}>⤒</button>
+                        <button type="button" className="btn ghost sm" aria-label="Subir" disabled={first} style={{ ...b, ...(first ? { opacity: 0.3 } : {}) }} onClick={() => move(s.id, -1)}>▲</button>
+                        <button type="button" className="btn ghost sm" aria-label="Bajar" disabled={last} style={{ ...b, ...(last ? { opacity: 0.3 } : {}) }} onClick={() => move(s.id, 1)}>▼</button>
+                        <button type="button" className="btn ghost sm" aria-label="Mover al fin" title="Al fin" disabled={last} style={{ ...b, ...(last ? { opacity: 0.3 } : {}) }} onClick={() => moveEnd(s.id, 'bottom')}>⤓</button>
+                      </div>
+                    )
+                  })()}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+  ) : null
+
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="eyebrow">{comoDueno ? 'Todas las rutas' : `Mi ruta · ${driverName(driverId)}`}</div>
@@ -273,41 +331,7 @@ export function MisEntregas() {
 
       <MiEfectivo recarga={entregadas.length} />
 
-      {orderedMine.length > 1 && (
-        <div className="card" style={{ padding: 0 }}>
-          <div style={{ padding: '14px 16px 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div className="eyebrow" style={{ margin: 0 }}>Orden de tu ruta</div>
-            <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>Acomódalas como te convenga · se guarda</span>
-          </div>
-          <div style={{ padding: '0 10px 10px' }}>
-            {orderedMine.map((s, i) => {
-              const info = stopInfo(s)
-              if (!info) return null
-              return (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 6px', borderBottom: i < orderedMine.length - 1 ? '1px solid var(--line)' : 'none' }}>
-                  <span className="mono" style={{ width: 22, height: 22, borderRadius: 7, background: 'var(--green-deep)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flex: 'none' }}>{i + 1}</span>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{info.name}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{info.addr}</div>
-                  </div>
-                  {(() => {
-                    const first = i === 0, last = i === orderedMine.length - 1
-                    const b: React.CSSProperties = { minWidth: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, padding: 0 }
-                    return (
-                      <div style={{ display: 'flex', gap: 4, flex: 'none' }}>
-                        <button type="button" className="btn ghost sm" aria-label="Mover al inicio" title="Al inicio" disabled={first} style={{ ...b, ...(first ? { opacity: 0.3 } : {}) }} onClick={() => moveEnd(s.id, 'top')}>⤒</button>
-                        <button type="button" className="btn ghost sm" aria-label="Subir" disabled={first} style={{ ...b, ...(first ? { opacity: 0.3 } : {}) }} onClick={() => move(s.id, -1)}>▲</button>
-                        <button type="button" className="btn ghost sm" aria-label="Bajar" disabled={last} style={{ ...b, ...(last ? { opacity: 0.3 } : {}) }} onClick={() => move(s.id, 1)}>▼</button>
-                        <button type="button" className="btn ghost sm" aria-label="Mover al fin" title="Al fin" disabled={last} style={{ ...b, ...(last ? { opacity: 0.3 } : {}) }} onClick={() => moveEnd(s.id, 'bottom')}>⤓</button>
-                      </div>
-                    )
-                  })()}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      {!unaALaVez && listaOrden}
 
       {routeUrl && (
         <a className="btn" href={routeUrl} target="_blank" rel="noreferrer" style={{ justifyContent: 'center' }}>
@@ -318,14 +342,15 @@ export function MisEntregas() {
       {mine.length === 0 ? (
         <Vacio icono="truck" titulo="No tienes entregas asignadas pendientes." pista="Cuando Almacén te asigne una ruta, aparecerá aquí." />
       ) : (
-        orderedMine.map((s) => {
+        (unaALaVez ? (actual ? [actual] : []) : orderedMine).map((s) => {
           const order = orderById[s.order_id]
           if (!order) return null
           const client = clienteDePedido(order)
           const deliv = deliveryOf(order) // dirección/teléfono de ENTREGA (del pedido; respaldo al perfil)
           const items = order.items.filter((it) => it.unit_price != null)
           return (
-            <div key={s.id} className="card parada-tarjeta" id={`parada-${s.id}`}>
+            <div key={s.id} className="card parada-tarjeta" id={`parada-${s.id}`} data-testid="parada-tarjeta">
+              {unaALaVez && orderedMine.length > 1 && <div className="parada-turno" data-testid="parada-turno">{orderedMine[0].id === s.id ? 'Siguiente parada' : 'Parada'} · {orderedMine.findIndex((x) => x.id === s.id) + 1} de {orderedMine.length}</div>}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                 <span className="mono" style={{ fontSize: 14 }}>{order.external_ref}</span>
                 {s.incident && !s.incident.resolved
@@ -344,7 +369,7 @@ export function MisEntregas() {
               {/* CALIDAD VISUAL (7 nov) · para usarse con una mano en la calle: quién y dónde en grande, y dos botones de 52 px
                   (Llamar · Navegar) en vez de enlaces chicos. */}
               <div className="parada">
-                <div className="parada-cliente">{client.name}{client.clinic ? <small>{client.clinic}</small> : null}</div>
+                <div className="parada-cliente">{capitalizarNombre(client.name) || client.name}{client.clinic ? <small>{client.clinic}</small> : null}</div>
                 <div className="parada-dir">{deliv.addr}</div>
                 <div className="parada-prod">{/* CAJAS-MEDIOS */}{items.map((it) => `${prodName[it.product_id ?? ''] ?? 'Producto'} ×${cantidadVista(products.find((p) => p.id === it.product_id), it.qty)}`).join(' · ')}</div>
                 {/* AUDITORÍA CHOFER · antes de tocar la puerta: ¿está pagado o hay que cobrar? */}
@@ -503,6 +528,8 @@ export function MisEntregas() {
           )
         })
       )}
+
+      {unaALaVez && listaOrden}
 
       {entregadas.length > 0 && (
         <div className="card" style={{ padding: 0 }}>
