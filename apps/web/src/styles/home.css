@@ -255,6 +255,12 @@
 .rh-paso:hover{background:var(--cp-slate-50)}
 .rh-paso b{font-size:var(--ds-fs-xl);font-weight:600;line-height:1.2}
 .rh-paso span{font-size:13px;color:var(--ink-3)}
+/* Dirección · decidir sin salir de Inicio */
+.rh-decision{flex-wrap:wrap;row-gap:10px}
+.rh-decision .taskrow-tx{flex:1 1 260px}
+.rh-decision-btns{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-left:auto}
+.rh-decision-nota{font-size:12.5px;color:var(--ink-3)}
+.rh-decision-mas{justify-content:center;min-height:48px;font-size:13.5px;font-weight:600;color:var(--green-deep)}
 /* Ventas · mis pedidos en curso con su avance */
 .rh-avance{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:6px;max-width:340px}
 .rh-avance i{height:4px;border-radius:999px;background:var(--line)}

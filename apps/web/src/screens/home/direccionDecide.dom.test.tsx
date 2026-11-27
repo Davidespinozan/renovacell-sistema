@@ -17,11 +17,15 @@ import { render, screen, cleanup, fireEvent, waitFor, act, within } from '@testi
 const srv = vi.hoisted(() => ({ role: 'pos' as string, capabilities: ['conversaciones'] as string[], setScreen: vi.fn(), user: { name: 'Lucía Hernández · Ventas', email: 'ventas1@renovacell.mx' } }))
 const bj = vi.hoisted(() => ({ tareas: [] as unknown[] }))
 vi.mock('../Bandeja', async (orig) => ({ ...(await orig<typeof import('../Bandeja')>()), useBandeja: () => ({ tareas: bj.tareas, fuentes: null }) }))
-vi.mock('../../data/ops/cancelacionSolicitud', () => ({ useSolicitudesCancelacion: () => [] }))
+const dec = vi.hoisted(() => ({ claims: [] as unknown[], solicitudes: [] as unknown[], revisar: vi.fn(async () => ({ ok: true })), resolver: vi.fn(async () => ({ ok: true })), confirmar: vi.fn(async () => true), texto: vi.fn(async () => 'no coincide el monto' as string | null) }))
+vi.mock('../../data/ops/cancelacionSolicitud', () => ({ useSolicitudesCancelacion: () => dec.solicitudes, ROL_SOLICITA: { pos: 'Ventas' }, resolverSolicitud: dec.resolver, solicitarCancelacion: vi.fn(), solicitudDe: () => null }))
+vi.mock('../../app/dialogos', () => ({ confirmar: dec.confirmar, avisar: vi.fn(async () => {}), pedirTexto: dec.texto }))
+vi.mock('../../data/hooks/useBankAccounts', () => ({ useBankAccounts: () => ({ data: [{ id: 'b1', bank_name: 'Banco Uno', account_number: '000011112222', clabe: null }] }) }))
+vi.mock('../../data/store/ordersStore', async (orig) => ({ ...(await orig<object>()), reviewTransfer: dec.revisar }))
 vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: srv.role, capabilities: srv.capabilities, setScreen: srv.setScreen, user: srv.user, screen: 'inicio' }), useRoleOpcional: () => null }))
 const ped = vi.hoisted(() => ({ lista: [] as unknown[] }))
 vi.mock('../../data/hooks/useOrders', () => ({ useAllOrders: () => ({ data: ped.lista }), useOrders: () => ({ data: [] }) }))
-vi.mock('../../data/hooks/useMoney', () => ({ useOrderMoney: () => ({ byOrder: {} }), usePaymentClaims: () => ({ data: [] }) }))
+vi.mock('../../data/hooks/useMoney', () => ({ useOrderMoney: () => ({ byOrder: {} }), usePaymentClaims: () => ({ data: dec.claims }) }))
 vi.mock('../../data/hooks/useShipments', () => ({ useShipments: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useLots', () => ({ useLots: () => ({ data: [] }) }))
 vi.mock('../../data/hooks/useDoctors', () => ({ useDoctors: () => ({ data: [] }) }))
@@ -112,7 +116,69 @@ beforeEach(() => {
 
 describe('Inicio de Dirección · Decide hoy y Vigila', () => {
   const t = (id: string, title: string, count = 1, tone = 'warn') => ({ id, icon: 'receipt', title, detail: 'detalle', count, tone, screen: 'av_ventas' })
-  beforeEach(() => { srv.role = 'admin'; srv.capabilities = []; bj.tareas = []; ped.lista = []; tomarFiltro('av_ventas') })
+  beforeEach(() => { srv.role = 'admin'; srv.capabilities = []; bj.tareas = []; ped.lista = []; tomarFiltro('av_ventas'); dec.claims = []; dec.solicitudes = []; dec.revisar.mockClear(); dec.resolver.mockClear(); dec.confirmar.mockClear(); dec.confirmar.mockResolvedValue(true); dec.texto.mockClear() })
+
+  describe('decidir sin salir de Inicio', () => {
+    const pedidoDe = (id: string, folio: string, nombre: string, total: number) => ({ id, external_ref: folio, status: 'pending_payment', payment_status: 'pending', payment_method: 'transfer', total, created_at: '2026-11-26T18:00:00Z', items: [], doctor_id: null, shipping_meta: { customer: { name: nombre } } })
+    const claim = (id: string, order: string, monto: number, extra: Record<string, unknown> = {}) => ({ id, order_id: order, method: 'transferencia', amount_declared: monto, reference: '9474', bank_account_id: 'b1', proof_path: 'p/' + id + '.jpg', status: 'reportado', declared_by: null, declared_at: '2026-11-26T19:0' + id.slice(-1) + ':00Z', resolved_at: null, reject_reason: null, ...extra })
+
+    it('un pago por validar se ve con su monto, pedido, cliente y cuenta; «Confirmar» pregunta y registra', async () => {
+      ped.lista = [pedidoDe('o1', 'S201', 'RENATO VEGA OSUNA', 9000)]
+      dec.claims = [claim('c1', 'o1', 9000)]
+      bj.tareas = [t('transfer', 'Pagos por validar', 1), t('cfdi', 'CFDI por emitir', 3)]
+      render(<RoleHome />); await flush()
+      const fila = await screen.findByTestId('decide-pago')
+      expect(fila).toHaveTextContent(/de \$9,000/); expect(fila).toHaveTextContent('S201'); expect(fila).toHaveTextContent('Renato Vega Osuna')
+      expect(fila).toHaveTextContent('Banco Uno ···· 2222'); expect(fila).toHaveTextContent('ref. 9474')
+      expect(within(screen.getByTestId('rh-sec-decide')).queryByText('Pagos por validar')).toBeNull()   // el renglón se cambió por el caso
+      fireEvent.click(within(fila).getByTestId('decide-pago-confirmar'))
+      await flush()
+      expect(dec.confirmar).toHaveBeenCalledTimes(1); expect(String(dec.confirmar.mock.calls[0][0])).toMatch(/\$9,000 \(transferencia\) del pedido S201/)
+      expect(dec.revisar).toHaveBeenCalledWith('o1', 'confirm')
+    })
+    it('si dice que no en la pregunta, no se registra nada', async () => {
+      ped.lista = [pedidoDe('o1', 'S201', 'Renato Vega', 9000)]; dec.claims = [claim('c1', 'o1', 9000)]; bj.tareas = [t('transfer', 'Pagos por validar', 1)]
+      dec.confirmar.mockResolvedValue(false)
+      render(<RoleHome />); await flush()
+      fireEvent.click(await screen.findByTestId('decide-pago-confirmar')); await flush()
+      expect(dec.revisar).not.toHaveBeenCalled()
+    })
+    it('«Rechazar» pide el motivo y lo manda, igual que en «Pagos por validar»', async () => {
+      ped.lista = [pedidoDe('o1', 'S201', 'Renato Vega', 9000)]; dec.claims = [claim('c1', 'o1', 9000)]; bj.tareas = [t('transfer', 'Pagos por validar', 1)]
+      render(<RoleHome />); await flush()
+      fireEvent.click(await screen.findByTestId('decide-pago-rechazar')); await flush()
+      expect(dec.revisar).toHaveBeenCalledWith('o1', 'reject', 'no coincide el monto')
+    })
+    it('un pago parcial dice el saldo del pedido; con más de 3 hay un renglón para verlos todos', async () => {
+      ped.lista = ['1', '2', '3', '4'].map((n) => pedidoDe('o' + n, 'S20' + n, 'Cliente ' + n, 9000))
+      dec.claims = ['1', '2', '3', '4'].map((n) => claim('c' + n, 'o' + n, n === '4' ? 4000 : 9000))
+      bj.tareas = [t('transfer', 'Pagos por validar', 4)]
+      render(<RoleHome />); await flush()
+      const filas = await screen.findAllByTestId('decide-pago')
+      expect(filas).toHaveLength(3)
+      expect(filas[0]).toHaveTextContent('saldo del pedido $9,000')            // el más reciente: declaró 4,000 de 9,000
+      fireEvent.click(screen.getByTestId('decide-pagos-mas'))
+      expect(srv.setScreen).toHaveBeenCalledWith('av_pagos')
+    })
+    it('sin el pendiente de pagos (otro rol o nada por validar) no aparece ningún pago en Inicio', async () => {
+      ped.lista = [pedidoDe('o1', 'S201', 'Renato Vega', 9000)]; dec.claims = [claim('c1', 'o1', 9000)]; bj.tareas = [t('reembolso', 'Reembolsos por resolver')]
+      render(<RoleHome />); await flush()
+      await screen.findByTestId('rh-sec-decide')
+      expect(screen.queryByTestId('decide-pago')).toBeNull()
+    })
+    it('una cancelación solicitada se aprueba o se rechaza ahí mismo', async () => {
+      ped.lista = [pedidoDe('o9', 'S180', 'Dra. Morales', 3200)]
+      dec.solicitudes = [{ id: 'r1', order_id: 'o9', requester_role: 'pos', reason: 'El cliente duplicó el pedido', created_at: '2026-11-26T18:00:00Z' }]
+      bj.tareas = [t('cancelaciones', 'Solicitudes de cancelación', 1, 'dang')]
+      render(<RoleHome />); await flush()
+      const decide = await screen.findByTestId('rh-sec-decide')
+      expect(within(decide).getByTestId('solicitudes-cancelacion')).toHaveTextContent('S180')
+      expect(within(decide).getByTestId('aviso-cancelacion')).toHaveTextContent('El cliente duplicó el pedido')
+      expect(within(decide).queryByText('Solicitudes de cancelación')).toBeNull()
+      fireEvent.click(within(decide).getByTestId('aprobar-cancelacion')); await flush()
+      expect(dec.resolver).toHaveBeenCalledWith('r1', true, null)
+    })
+  })
 
   it('«Pedidos en curso»: cuántos hay en cada paso, y cada cifra abre Ventas ya filtrada', async () => {
     const o = (id: string, status: string, extra: Record<string, unknown> = {}) => ({ id, external_ref: 'S' + id, status, payment_status: 'paid', payment_method: 'transfer', total: 100, created_at: '2026-11-26T18:00:00Z', items: [], shipping_meta: {}, ...extra })

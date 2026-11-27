@@ -36,6 +36,10 @@ import { etapaSeguimiento, useSeguimiento } from '../../data/ops/seguimientoVent
 import { seSurteSinPago, statusView } from '../doctor/orderStatus'
 import { esRecoge } from '../../data/ops/seguimiento'
 import { pedirFiltro } from '../../data/store/filtroInicial'
+import { metodoLabel, usePagosPorValidar } from '../admin/usePagosPorValidar'
+import { SolicitudesCancelacionPendientes } from '../../app/Cancelacion'
+import { useSolicitudesCancelacion } from '../../data/ops/cancelacionSolicitud'
+import { confirmar } from '../../app/dialogos'
 import { useOrderMoney } from '../../data/hooks/useMoney'
 import { telParaMarcar } from '../../lib/telefono'
 import { deliveryOf } from '../../data/mock/profiles'
@@ -322,6 +326,14 @@ export function HomeDireccion() {
     return c
   }, [pedidosDir])
   const irPaso = (paso: string) => { pedirFiltro('av_ventas', 'paso:' + paso); setScreen('av_ventas') }
+  // DECIDIR SIN SALIR DE INICIO (27 nov 2026): los pagos por validar y las cancelaciones se resuelven aquí mismo, con
+  // las MISMAS acciones de sus pantallas («Pagos por validar» y Ventas). Solo aparecen si ese pendiente ya le salía.
+  const pagos = usePagosPorValidar()
+  const cancelacionesAqui = useSolicitudesCancelacion()
+  const confirmarPago = async (t: (typeof pagos.rows)[number]['t'], o: NonNullable<(typeof pagos.rows)[number]['o']>) => {
+    if (!(await confirmar(`¿Confirmas el pago de ${money(t.amount_declared)} (${metodoLabel(t.method).toLowerCase()}) del pedido ${o.external_ref ?? ''}? Se registra como cobrado.`, { aceptar: 'Sí, confirmar' }))) return
+    if (await pagos.confirmar(o)) toast(`Pago confirmado · ${o.external_ref ?? ''}`)
+  }
   return (
     <div className="rh" data-testid="home-direccion">
       {fuentes}
@@ -368,11 +380,40 @@ export function HomeDireccion() {
       {(() => {
         const resto = [...tareas].sort(porUrgencia).filter((t) => t.id !== 'comercial')
         const decide = resto.filter((t) => DECIDE_HOY.has(t.id)); const vigila = resto.filter((t) => !DECIDE_HOY.has(t.id))
+        const tPagos = decide.find((t) => t.id === 'transfer'); const tCanc = decide.find((t) => t.id === 'cancelaciones')
+        const pagosAqui = tPagos ? pagos.rows.filter((r) => r.o).slice(0, 3) : []
+        // El renglón de cada pendiente se cambia por sus casos SOLO si los casos ya están a la vista; si no, queda el renglón.
+        const cancAqui = !!tCanc && cancelacionesAqui.length > 0
+        const enRenglon = decide.filter((t) => !(t.id === 'transfer' && pagosAqui.length > 0) && !(t.id === 'cancelaciones' && cancAqui))
         return (
           <>
             {decide.length > 0 && (
               <Seccion titulo="Decide hoy" nivel="atencion" conteo={decide.reduce((s, t) => s + t.count, 0)} id="decide">
-                <div className="grid" style={{ gap: 10 }}><ListaTareas tareas={decide} onGo={setScreen} /></div>
+                <div className="grid" style={{ gap: 10 }}>
+                  {pagosAqui.length > 0 && (
+                    <div className="tasklist" data-testid="decide-pagos">
+                      {pagosAqui.map(({ t, o }) => {
+                        const saldo = pagos.byOrder[o!.id]?.saldo ?? o!.total ?? 0
+                        return (
+                          <div key={t.id} className="taskrow rh-decision" data-testid="decide-pago">
+                            <span className="taskrow-tx">
+                              <span className="taskrow-t">{metodoLabel(t.method)} de {money(t.amount_declared)}</span>
+                              <span className="taskrow-d"><span className="mono">{o!.external_ref}</span> · {capitalizarNombre(pagos.clientName(o)) || pagos.clientName(o)} · {pagos.bankLabel(t)}{t.reference ? ` · ref. ${t.reference}` : ''}{Math.abs(saldo - t.amount_declared) > 0.01 ? ` · saldo del pedido ${money(saldo)}` : ''}</span>
+                            </span>
+                            <span className="rh-decision-btns">
+                              {t.proof_path ? <button type="button" className="btn ghost sm" onClick={() => void pagos.verProof(t.proof_path!)} data-testid="decide-pago-ver">Ver comprobante</button> : <span className="rh-decision-nota">Sin comprobante</span>}
+                              <button type="button" className="btn ghost sm" disabled={pagos.busy === o!.id} onClick={() => void pagos.rechazar(o!)} data-testid="decide-pago-rechazar">Rechazar</button>
+                              <button type="button" className="btn sm" disabled={pagos.busy === o!.id} onClick={() => void confirmarPago(t, o!)} data-testid="decide-pago-confirmar">Confirmar</button>
+                            </span>
+                          </div>
+                        )
+                      })}
+                      {tPagos && tPagos.count > pagosAqui.length && <button type="button" className="taskrow rh-decision-mas" onClick={() => setScreen('av_pagos')} data-testid="decide-pagos-mas">Ver los {tPagos.count} pagos por validar</button>}
+                    </div>
+                  )}
+                  {cancAqui && <SolicitudesCancelacionPendientes />}
+                  {enRenglon.length > 0 && <ListaTareas tareas={enRenglon} onGo={setScreen} />}
+                </div>
               </Seccion>
             )}
             <Seccion titulo="Vigila" nivel="continuar" conteo={vigila.reduce((s, t) => s + t.count, 0)} id="bandeja">

@@ -3,74 +3,18 @@
 // comprobante esté aquí, NO hay dinero en el libro y el pedido no está pagado.
 // Al confirmar nace el ASIENTO (`revisar_pago`) y el servidor recalcula payment_status;
 // al rechazar (con motivo) el pedido queda sin pagar y el cliente puede volver a reportar.
-import { orderClientName } from '../../data/ops/orderClient'
-import { avisar, pedirTexto } from '../../app/dialogos'   // CALIDAD VISUAL · diálogos del sistema
-import React, { useMemo, useState } from 'react'
+import React from 'react'
 import { BadgeDollarSign, Clock, Landmark, FileImage, Check, X } from 'lucide-react'
 import { money, fmtDate } from '../../lib/format'
-import { useAllOrders, type OrderWithItems } from '../../data/hooks/useOrders'
-import { useDoctors } from '../../data/hooks/useDoctors'
-import { useBankAccounts } from '../../data/hooks/useBankAccounts'
-import { usePaymentClaims, useOrderMoney } from '../../data/hooks/useMoney'
-import { reviewTransfer } from '../../data/store/ordersStore'
-import { signedProofUrl } from '../../lib/uploads'
-import { METODOS, type PaymentClaim } from '../../data/ops/money'
-import { clasificarDeclaraciones } from '../../data/ops/pagosPendientes'
 import { useRole } from '../../auth/RoleContext'
 import { reloadOrders } from '../../data/store/ordersStore'
-import type { Profile } from '../../data/types'
 import { Vacio } from '../../app/EmptyState'
-
-const metodoLabel = (m: string): string => METODOS.find((x) => x.value === m)?.label ?? m
-const last4 = (s?: string | null): string => { const d = (s ?? '').replace(/\D/g, ''); return d ? d.slice(-4) : '' }
+import { metodoLabel, usePagosPorValidar } from './usePagosPorValidar'
 
 export function PagosPorValidar() {
-  const { data: orders } = useAllOrders()
-  const { data: doctors } = useDoctors()
-  const { data: banks } = useBankAccounts()
-  const { data: claims } = usePaymentClaims()
-  const { byOrder } = useOrderMoney()
+  // Los datos y las dos decisiones viven en usePagosPorValidar (los comparte el Inicio de Dirección).
+  const { rows, pend, byOrder, busy, clientName, bankLabel, verProof, confirmar, rechazar } = usePagosPorValidar()
   const { setScreen } = useRole()
-  const [busy, setBusy] = useState<string | null>(null)
-
-  const doctorsById = useMemo(() => Object.fromEntries(doctors.map((d) => [d.id, d])) as Record<string, Profile | undefined>, [doctors])
-  const banksById = useMemo(() => Object.fromEntries(banks.map((b) => [b.id, b])), [banks])
-  const clientName = (o: OrderWithItems | null) => (!o ? 'Pedido aún no cargado' : orderClientName(o, (id) => doctorsById[id]?.full_name, o.doctor_id ? 'Doctor' : 'Mostrador (POS)'))
-  const bankLabel = (t: PaymentClaim): string => {
-    const b = t.bank_account_id ? banksById[t.bank_account_id] : null
-    if (!b) return 'Cuenta no indicada'
-    const tail = last4(b.account_number) || last4(b.clabe)
-    return `${b.bank_name}${tail ? ` ···· ${tail}` : ''}`
-  }
-
-  // La cola son los comprobantes ABIERTOS (status 'reportado'). No se filtra por
-  // payment_status: un pedido con pago PARCIAL puede tener otro comprobante en revisión.
-  // PAY-EXP-01A-3 · MISMO universo que el contador de Bandeja (clasificarDeclaraciones): los de pedidos cancelados
-  // van a "Revisión económica" (aviso abajo) y los de pedidos aún no cargados se listan, no se esconden.
-  const pend = useMemo(() => clasificarDeclaraciones(claims, orders), [claims, orders])
-  const rows = useMemo(() => pend.vigentes.map(({ claim, order }) => ({ t: claim, o: order })), [pend])
-
-  const verProof = async (path: string) => { const u = await signedProofUrl(path); if (u) window.open(u, '_blank') }
-
-  const confirmar = async (o: OrderWithItems) => {
-    if (busy) return
-    setBusy(o.id)
-    try {
-      const r = await reviewTransfer(o.id, 'confirm')
-      if (!r.ok) void avisar(r.error ?? 'No se pudo confirmar el pago.')
-    } finally { setBusy(null) }
-  }
-  const rechazar = async (o: OrderWithItems) => {
-    if (busy) return
-    const motivo = (await pedirTexto('Motivo del rechazo (se avisa al cliente para que reintente). No marca pagado ni cancela el pedido.'))
-    if (motivo == null) return
-    if (!motivo.trim()) { void avisar('El rechazo necesita un motivo.'); return }
-    setBusy(o.id)
-    try {
-      const r = await reviewTransfer(o.id, 'reject', motivo)
-      if (!r.ok) void avisar(r.error ?? 'No se pudo rechazar.')
-    } finally { setBusy(null) }
-  }
 
   return (
     <div className="grid" style={{ gap: 16 }}>
