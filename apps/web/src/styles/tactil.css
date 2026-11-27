@@ -1,0 +1,72 @@
+/* ============================================================================
+   CAPA TÁCTIL (27 nov 2026) · casi todo se usa en iPad o tablet.
+   Las reglas para el dedo (objetivos de 44 px, campos de 16 px sin zoom de iOS) vivían solo en «max-width: 640px», así
+   que el iPad, en cualquier orientación, se quedaba con tamaños de mouse. Aquí se activan en TODA pantalla táctil
+   (pointer: coarse), sin importar el ancho; en computadora con mouse no cambia nada.
+   Medido en iPad Air (1180×820 y 820×1180): el 85 % de los objetivos chicos eran piezas que se repiten en cada
+   pantalla (menú lateral, sus encabezados, Ajustes / Cerrar sesión, filtros). Se carga al final; quitar el @import la
+   apaga entera.
+   ============================================================================ */
+@media (pointer: coarse) {
+  /* 1) iOS hace zoom al tocar un campo con letra menor a 16 px. !important: varios campos traen tamaño en línea. */
+  input, select, textarea { font-size: 16px !important; }
+
+  /* 2) Objetivos de al menos 44 px (Apple HIG), los mismos que ya tenía el teléfono. */
+  .btn, .btn.sm, .devchip, .lchip, .backbtn, .seg button, .mclose, .dbtn, .fchip, .fbtn { min-height: 44px; }
+  .btn.sm { padding-top: 10px; padding-bottom: 10px; }
+  .fchip, .seg button { display: inline-flex; align-items: center; justify-content: center; }
+  .fbtn { min-width: 44px; justify-content: center; }
+  select, input[type="date"], input[type="number"], input[type="text"], input[type="search"], input[type="email"],
+  input[type="password"], input[type="tel"] { min-height: 44px; }
+  input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; }
+  .page-h-ayuda { min-height: 40px; padding: 8px 0; }
+  .av-todo-leido { min-height: 44px; }
+  .dcat-cats button { min-height: 44px; padding: 0 16px; }   /* categorías del catálogo del doctor */
+  /* Interruptores (Equipo, Configuración): de 44×26 a 52×32, con la bolita proporcional. */
+  input.interruptor { width: 52px !important; height: 32px !important; }
+  input.interruptor::after { top: 4px; left: 4px; width: 24px; height: 24px; }
+  input.interruptor:checked::after { transform: translateX(20px); }
+
+  /* 3) Cabecera: botones redondos de 44 px y sin la pista ⌘K (en iPad no hay teclado de computadora). */
+  .icobtn { width: 44px; height: 44px; }
+  .kbd-hint { display: none; }
+
+  /* 4) Menú lateral (iPad horizontal): renglones de 44 px, encabezados de sección tocables y legibles. */
+  .nav a { min-height: 44px; }
+  .nav .grp-btn { min-height: 40px; }
+  /* Ajustes y Cerrar sesión: 44 px y con aire entre ellos (Cerrar sesión además pide confirmación). */
+  .su-ic { width: 44px; height: 44px; }
+  .su-ic + .su-ic { margin-left: 6px; }
+  .side-user--compacto .su-open { min-height: 44px; }
+  .side-stryv { min-height: 44px; justify-content: center; font-size: 12px; }
+
+  /* 4b) Letra mínima de 12 px en lo que se lee a cada rato: estados, contadores y encabezados del menú. */
+  .pill { font-size: 12px; }
+  .op-fila .pill { font-size: 12px; }
+  .seg-conteo { font-size: 12px; }
+  .rh-count { font-size: 12px; min-width: 20px; height: 20px; }
+  .icobtn .bdg.bdg-n { font-size: 11.5px; }
+  .nav .grp-btn { font-size: 12px; }
+  .brand .bs { font-size: 10.5px; letter-spacing: .14em; white-space: nowrap; }
+  /* El correo debajo del nombre se cortaba con los botones más grandes; en tablet basta el nombre (el correo sigue
+     al tocar para editar el perfil). */
+  .side-user--compacto .su-role { display: none; }
+
+  /* 5) Chofer: su siguiente entrega ocupa todo el ancho (antes media pantalla vacía) y los botones son grandes y
+        parejos: lo usa con prisa, de pie o en el carro. */
+  .rh-cards:has(> [data-testid="siguiente-entrega"]:only-child) { grid-template-columns: 1fr; }
+  [data-testid="siguiente-entrega"] .rh-ctas { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+  [data-testid="siguiente-entrega"] .rh-ctas .btn { min-height: 52px; font-size: 15px; justify-content: center; }
+}
+
+/* 6) Tablet (táctil y ancha): las pestañas bajan a un segundo renglón en vez de esconderse a la derecha. En el teléfono
+      siguen en una fila deslizable (mobile.css). */
+@media (pointer: coarse) and (min-width: 701px) {
+  .seg--pestanas { flex-wrap: wrap !important; overflow-x: visible; -webkit-mask-image: none; mask-image: none; }
+}
+
+/* 7) Catálogo del doctor en tablet horizontal: con el menú y «Tu pedido» a los lados cabían 2 productos por renglón;
+      con tarjetas desde 160 px caben 3. */
+@media (pointer: coarse) and (min-width: 901px) {
+  .dcat-grid:not(.dcat-grid--agotados) { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+}

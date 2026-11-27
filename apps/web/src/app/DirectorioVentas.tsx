@@ -136,7 +136,7 @@ export function DirectorioVentas({ title, conCartera, clienteCartera = carteraPo
             <label className="searchbox op-search">
               <Search aria-hidden />
               <input value={texto} onChange={(e) => setTexto(e.target.value)} aria-label="Buscar cliente" maxLength={80}
-                placeholder="Nombre (3 letras o más) o últimos 4 dígitos del teléfono" />
+                placeholder="Nombre o últimos 4 del teléfono" />
             </label>
             <button className="btn" type="submit" disabled={busqueda.fase === 'buscando'} data-testid="dv-buscar">Buscar</button>
           </form>
