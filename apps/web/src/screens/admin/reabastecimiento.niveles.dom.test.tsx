@@ -144,6 +144,23 @@ describe('<Reabastecimiento> · Dirección ajusta los niveles de cada producto',
   })
 })
 
+describe('<Reabastecimiento> · buscador', () => {
+  it('filtra por nombre sin importar acentos, mayúsculas ni el orden de las palabras, y dice cuántos quedan', () => {
+    render(<Reabastecimiento />)
+    expect(screen.getAllByTestId(/^fila-stock-/)).toHaveLength(4)
+    fireEvent.change(screen.getByTestId('compras-buscar'), { target: { value: 'CAMINO producto' } })
+    expect(screen.getAllByTestId(/^fila-stock-/).map((f) => f.getAttribute('data-testid'))).toEqual(['fila-stock-p-camino'])
+    expect(screen.getByTestId('compras-buscar-cuenta')).toHaveTextContent('1 de 4')
+    fireEvent.change(screen.getByTestId('compras-buscar'), { target: { value: 'existéncia' } })   // con acento de más
+    expect(screen.getAllByTestId(/^fila-stock-/).map((f) => f.getAttribute('data-testid'))).toEqual(['fila-stock-p-ok'])
+    fireEvent.change(screen.getByTestId('compras-buscar'), { target: { value: 'zzz' } })
+    expect(screen.queryAllByTestId(/^fila-stock-/)).toHaveLength(0)
+    expect(screen.getByText('Ningún producto coincide con «zzz».')).toBeInTheDocument()
+    fireEvent.change(screen.getByTestId('compras-buscar'), { target: { value: '' } })
+    expect(screen.getAllByTestId(/^fila-stock-/)).toHaveLength(4)
+  })
+})
+
 describe('dónde se guardan y quién puede', () => {
   const sql = readFileSync(resolve(__dirname, '../../../../../supabase/migrations/20270408090000_stock_niveles.sql'), 'utf8')
   it('van en la tabla privada de costos, nunca en la columna del producto que se publica en el sitio', () => {

@@ -63,7 +63,16 @@ export function Reabastecimiento() {
   )
   const bajos = useMemo(() => filas.filter((x) => x.qty <= nivelDe(niveles, x.p.id).minimo), [filas, niveles])
   const [soloBajos, setSoloBajos] = useState(false)
-  const visibles = soloBajos ? bajos : filas
+  // BUSCADOR (27 nov 2026, dueño: «en compras hay que poner un buscador porque es difícil buscar en la lista»): por nombre
+  // o clave, sin distinguir mayúsculas ni acentos, y con varias palabras en cualquier orden.
+  const [busca, setBusca] = useState('')
+  const visibles = useMemo(() => {
+    const base = soloBajos ? bajos : filas
+    const plano = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    const palabras = plano(busca).split(/\s+/).filter(Boolean)
+    if (palabras.length === 0) return base
+    return base.filter(({ p }) => { const t = plano(`${p.name} ${(p as { sku?: string | null }).sku ?? ''}`); return palabras.every((w) => t.includes(w)) })
+  }, [soloBajos, bajos, filas, busca])
 
   // Lo que ya se compró y todavía no llega, por producto: se descuenta de lo que se sugiere comprar.
   const enCaminoDe = useMemo(() => {
@@ -120,6 +129,11 @@ export function Reabastecimiento() {
             ]}
           />
         </div>
+        <div style={{ padding: '4px 16px 10px' }}>
+          <input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar producto por nombre o clave…" aria-label="Buscar producto" data-testid="compras-buscar"
+            style={{ width: '100%', maxWidth: 420, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, outline: 'none', backgroundColor: 'var(--cp-surface)' }} />
+          {busca.trim() !== '' && <span className="ms" style={{ marginLeft: 10, color: 'var(--ink-3)' }} data-testid="compras-buscar-cuenta">{visibles.length} de {(soloBajos ? bajos : filas).length}</span>}
+        </div>
         <div style={{ padding: '0 14px 8px' }}>
           <table className="tbl-cards">
             <thead><tr><th>Producto</th><th>Stock</th><th>Estado</th><th>Mínimo · ideal</th><th>Sugerido</th><th></th></tr></thead>
@@ -168,7 +182,7 @@ export function Reabastecimiento() {
               })}
               {visibles.length === 0 && (
                 <tr><td colSpan={6} style={{ color: 'var(--ink-3)' }}>
-                  {soloBajos ? 'Ningún producto está por debajo de su mínimo.' : 'Todavía no hay productos con inventario.'}
+                  {busca.trim() !== '' ? `Ningún producto coincide con «${busca.trim()}».` : soloBajos ? 'Ningún producto está por debajo de su mínimo.' : 'Todavía no hay productos con inventario.'}
                 </td></tr>
               )}
             </tbody>
