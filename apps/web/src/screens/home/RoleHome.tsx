@@ -24,7 +24,10 @@ import { MOTIVO_RUTEO } from '../../data/ops/atencion'
 import { irAConversacion, irASolicitud } from '../../data/store/navIntentStore'
 import { useShipments } from '../../data/hooks/useShipments'
 import { useAllOrders } from '../../data/hooks/useOrders'
-import { driverIdByEmail } from '../../data/mock/shipments'
+import { driverIdByEmail, driverName } from '../../data/mock/shipments'
+import { cargaPorConfirmar, confirmarTodaLaCarga, pedirParada } from '../../data/ops/rutaChofer'   // CHOFER · menos pasos
+import { toast } from '../../app/Toast'
+import { telParaMarcar } from '../../lib/telefono'
 import { deliveryOf } from '../../data/mock/profiles'
 import { AtajosMovil, Bienvenida, Cargando, ErrorLectura, Nota, Seccion, TarjetaAtencion, Tarjetas, Vacio, type Acceso } from './primitives'
 import { capitalizarNombre, saludo } from '../../lib/nombres'
@@ -307,7 +310,7 @@ export function HomeAlmacen({ etiqueta = 'Almacén y empaque' }: { etiqueta?: st
 export function HomeChofer() {
   const { user, setScreen, vistaPrevia } = useRole()
   const comoDueno = vistaPrevia === 'driver'   // DUEÑO · trabajando como Chofer ve todas las rutas
-  const { data: shipments } = useShipments()
+  const { data: shipments, confirmLoad } = useShipments()
   const { data: orders } = useAllOrders()
   const driverId = driverIdByEmail(user?.email)
   // Misma regla que "Mis entregas": solo con chofer resuelto (evita que driver_id null entre por null===null).
@@ -322,6 +325,19 @@ export function HomeChofer() {
   }, [mias, driverId])
   const pedido = siguiente ? orders.find((o) => o.id === siguiente.order_id) : undefined
   const parada = pedido ? deliveryOf(pedido) : null
+  // CHOFER · MENOS PASOS (27 nov 2026): la carga se recibe completa de un toque desde Inicio, y la siguiente parada trae
+  // sus tres botones (Entregar · Llamar · Navegar). «Entregar» baja directo a ESA parada en «Mi ruta».
+  const porRecibir = cargaPorConfirmar(mias)
+  const [recibiendo, setRecibiendo] = useState(false)
+  const recibirTodo = async () => {
+    setRecibiendo(true)
+    const r = await confirmarTodaLaCarga(porRecibir.map((s) => ({ id: s.id, folio: orders.find((o) => o.id === s.order_id)?.external_ref ?? s.order_id })), driverName(driverId), confirmLoad)
+    setRecibiendo(false)
+    toast(r.texto, r.ok ? 'ok' : 'error')
+  }
+  const enReparto = siguiente?.status === 'out_for_delivery' || siguiente?.status === 'incident'
+  const tel = telParaMarcar(parada?.phone)
+  const porCobrar = pedido && pedido.payment_status !== 'paid' && pedido.total != null ? `Cobrar ${money(pedido.total)} al entregar` : null
   const atajos = useAccesos([{ key: 'driver_home', label: 'Mis entregas', icon: 'truck' }])
   return (
     // Pulido (29 oct): sin etiqueta "Chofer" (ya la dice la barra superior) y el resumen del día en el saludo;
@@ -337,12 +353,28 @@ export function HomeChofer() {
           </Tarjetas>
         </Seccion>
       )}
+      {porRecibir.length > 0 && (
+        <Seccion titulo="Tu carga" nivel="atencion" conteo={porRecibir.length} id="carga">
+          <Tarjetas>
+            <TarjetaAtencion tono="warn" icono="truck" testid="carga-por-recibir" titulo={`Almacén te entregó ${porRecibir.length} pedido${porRecibir.length === 1 ? '' : 's'}`}
+              lineas={['Cuenta tus paquetes y confirma que los recibiste.']}
+              ctas={[
+                { label: recibiendo ? 'Confirmando tu carga…' : `Recibí mi carga (${porRecibir.length} pedido${porRecibir.length === 1 ? '' : 's'})`, primaria: true, disabled: recibiendo, onClick: () => void recibirTodo(), testid: 'inicio-recibir-carga' },
+                { label: 'Falta algo o viene dañado', onClick: () => setScreen('driver_home') },
+              ]} />
+          </Tarjetas>
+        </Seccion>
+      )}
       <Seccion titulo="Tu siguiente entrega" nivel="continuar" conteo={mias.length} id="siguiente">
         {!siguiente ? <Vacio icon="truck" titulo="Tu ruta está libre" detalle="Cuando Almacén te asigne carga, aquí verás la dirección y cómo llegar." testid="vacio-chofer" /> : (
           <Tarjetas>
             <TarjetaAtencion tono="neu" icono="truck" testid="siguiente-entrega" titulo={parada?.name ?? 'Entrega asignada'} estado={pedido?.external_ref ?? undefined}
-              lineas={[parada?.addr || null, mias.length > 1 ? `Después: ${mias.length - 1} parada${mias.length - 1 === 1 ? '' : 's'} más` : 'Es tu última parada']}
-              ctas={[{ label: 'Ir a la entrega', primaria: true, onClick: () => setScreen('driver_home') }]} />
+              lineas={[parada?.addr || null, porCobrar, mias.length > 1 ? `Después: ${mias.length - 1} parada${mias.length - 1 === 1 ? '' : 's'} más` : 'Es tu última parada']}
+              ctas={[
+                { label: enReparto ? 'Entregar' : 'Ver la parada', primaria: true, testid: 'ir-parada', onClick: () => { pedirParada(siguiente.id); setScreen('driver_home') } },
+                ...(tel ? [{ label: 'Llamar', onClick: () => { window.location.href = `tel:${tel}` } }] : []),
+                ...(parada?.addr ? [{ label: 'Navegar', onClick: () => { window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parada.addr)}`, '_blank', 'noopener') } }] : []),
+              ]} />
           </Tarjetas>
         )}
       </Seccion>

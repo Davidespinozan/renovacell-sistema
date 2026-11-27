@@ -2,7 +2,7 @@
 // FIRMA de quien recibe (23 nov 2026: antes era foto). Al confirmar, envío y pedido pasan a Entregado (cierra el ciclo).
 import { Vacio } from '../../app/EmptyState'
 import { Phone, Navigation } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 // Orden de la ruta elegido por el chofer, persistido por chofer (sobrevive recargas del día).
 import { Icon } from '../../app/icons'
 import { fmtDate, money } from '../../lib/format'
@@ -23,6 +23,7 @@ import { driverIdByEmail, driverName } from '../../data/mock/shipments'
 import { clienteDePedido, deliveryOf } from '../../data/mock/profiles'
 import { useRole } from '../../auth/RoleContext'
 import { cantidadVista } from '../../lib/cajas'
+import { cargaPorConfirmar, confirmarTodaLaCarga, nombreSugerido, tomarParada } from '../../data/ops/rutaChofer'   // CHOFER · menos pasos
 
 const INCIDENT_TYPES = ['Cliente ausente', 'Dirección incorrecta', 'Pedido rechazado', 'No se pudo contactar', 'Otro']
 // Problemas al CONTAR la carga (antes de salir a reparto): distintos de las incidencias de entrega.
@@ -50,6 +51,7 @@ export function MisEntregas() {
   const [uploading, setUploading] = useState<Record<string, boolean>>({}) // guardando la firma / entregando
   const [upErr, setUpErr] = useState<Record<string, boolean>>({}) // la subida falló (reintentar)
   const [cargando, setCargando] = useState<Record<string, boolean>>({}) // confirmando la carga (sin doble toque)
+  const [cargandoTodo, setCargandoTodo] = useState(false) // CHOFER · confirmando TODA la carga de un toque
   const [received, setReceived] = useState<Record<string, string>>({})
   const [incType, setIncType] = useState<Record<string, string>>({})
   const [incNote, setIncNote] = useState<Record<string, string>>({})
@@ -136,6 +138,25 @@ export function MisEntregas() {
     () => orderedIds.map((id) => mine.find((s) => s.id === id)).filter((s): s is (typeof mine)[number] => Boolean(s)),
     [orderedIds, mine],
   )
+  // CHOFER · MENOS PASOS (27 nov 2026): con 6 pedidos eran 6 confirmaciones antes de poder entregar el primero. Un toque
+  // confirma toda la carga; el botón de cada pedido se queda (y ahí se reporta lo que falte o venga dañado).
+  const despachadas = cargaPorConfirmar(orderedMine)
+  const recibirTodo = async () => {
+    setCargandoTodo(true)
+    const r = await confirmarTodaLaCarga(despachadas.map((s) => ({ id: s.id, folio: orderById[s.order_id]?.external_ref ?? s.order_id })), driverName(driverId), confirmLoad)
+    setCargandoTodo(false)
+    avisar(r.ok, r.texto)
+  }
+  // «Entregar» en Inicio trae al chofer a ESA parada, no a lo alto de la lista.
+  const paradaDestino = useRef<string | null>(tomarParada())
+  useEffect(() => {
+    const id = paradaDestino.current
+    if (!id) return
+    const el = document.getElementById(`parada-${id}`)
+    if (!el) return
+    paradaDestino.current = null
+    el.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
+  }, [orderedMine.length])
   const persistOrder = (seq: string[]) => {
     setRouteOrder(seq)
     try { localStorage.setItem(KEY, JSON.stringify(seq)) } catch { /* almacenamiento no disponible */ }
@@ -232,6 +253,16 @@ export function MisEntregas() {
       {enRuta && rastreo === 'denegado' && <div className="rastreo-aviso rastreo-mal" data-testid="rastreo-denegado">📍 Activa la ubicación para esta página: toca el candado junto a la dirección (o Ajustes → Ubicación del navegador) y elige «Permitir».</div>}
       {enRuta && rastreo === 'no_disponible' && <div className="rastreo-aviso rastreo-mal">📍 No se pudo leer tu ubicación. Revisa que el GPS del teléfono esté encendido.</div>}
 
+      {despachadas.length > 1 && (
+        <div className="card carga-toda" data-testid="carga-toda">
+          <div className="eyebrow" style={{ margin: 0 }}>Tu carga · {despachadas.length} pedidos</div>
+          <p className="carga-toda-tx">Almacén ya te la entregó. Cuenta tus paquetes y confírmala de un toque. Si falta algo o viene dañado, repórtalo en ese pedido, aquí abajo.</p>
+          <button className="btn entrega-ok" type="button" disabled={cargandoTodo} onClick={() => void recibirTodo()} data-testid="carga-toda-confirmar">
+            <Icon name="check" /> {cargandoTodo ? 'Confirmando tu carga…' : `Recibí mi carga (${despachadas.length} pedidos)`}
+          </button>
+        </div>
+      )}
+
       {/* Resumen de la ruta (asignada por Empaque al elegir chofer) */}
       {/* pp-kpis3: en móvil las tres caben en una fila compacta (antes 2+1, la tercera a lo ancho). */}
       <div className="grid sigs pp-kpis3">
@@ -294,7 +325,7 @@ export function MisEntregas() {
           const deliv = deliveryOf(order) // dirección/teléfono de ENTREGA (del pedido; respaldo al perfil)
           const items = order.items.filter((it) => it.unit_price != null)
           return (
-            <div key={s.id} className="card">
+            <div key={s.id} className="card parada-tarjeta" id={`parada-${s.id}`}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                 <span className="mono" style={{ fontSize: 14 }}>{order.external_ref}</span>
                 {s.incident && !s.incident.resolved
@@ -375,8 +406,16 @@ export function MisEntregas() {
               <ol className="entrega-pasos">
                 <li className={received[s.id]?.trim() ? 'hecho' : undefined}>
                   <span className="entrega-n" aria-hidden>{received[s.id]?.trim() ? <Icon name="check" /> : 1}</span>
-                  <input className="entrega-quien" value={received[s.id] ?? ''} aria-label="Quién recibió"
-                    onChange={(e) => setReceived((r) => ({ ...r, [s.id]: e.target.value }))} placeholder="¿Quién recibe? (nombre)" />
+                  <div className="entrega-quien-caja">
+                    <input className="entrega-quien" value={received[s.id] ?? ''} aria-label="Quién recibió"
+                      onChange={(e) => setReceived((r) => ({ ...r, [s.id]: e.target.value }))} placeholder="¿Quién recibe? (nombre)" />
+                    {/* CHOFER · MENOS PASOS: casi siempre recibe el mismo cliente; se toca su nombre en vez de escribirlo. */}
+                    {!received[s.id]?.trim() && nombreSugerido(client.name) && (
+                      <button type="button" className="btn ghost sm entrega-sug" onClick={() => setReceived((r) => ({ ...r, [s.id]: nombreSugerido(client.name) ?? '' }))} data-testid="recibe-sugerido">
+                        Recibe {nombreSugerido(client.name)}
+                      </button>
+                    )}
+                  </div>
                 </li>
                 <li className={firmas[s.id] ? 'hecho entrega-firma' : 'entrega-firma'}>
                   <span className="entrega-n" aria-hidden>{firmas[s.id] ? <Icon name="check" /> : 2}</span>

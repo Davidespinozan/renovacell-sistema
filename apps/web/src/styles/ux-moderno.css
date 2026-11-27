@@ -175,6 +175,11 @@ button.cifra-v{cursor:pointer}
 .entrega-pasos li.hecho .firma-lienzo{border-style:solid;border-color:var(--ux-accent)}
 .firma-pie{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:var(--fs-sm, 13px);color:var(--ux-ink-3)}
 .entrega-ok{width:100%;min-height:50px;justify-content:center;font-size:var(--fs-md)}
+/* CHOFER · menos pasos (27 nov): toda la carga de un toque, nombre para tocar y la parada a la que se llega desde Inicio */
+.carga-toda-tx{margin:6px 0 12px;font-size:var(--fs-sm);line-height:1.45;color:var(--ux-ink-2)}
+.entrega-quien-caja{display:grid;gap:8px;min-width:0}
+.entrega-sug{justify-self:start;min-height:44px;max-width:100%;white-space:normal;text-align:left}
+.parada-tarjeta{scroll-margin-top:72px}
 .entrega-ok:disabled{opacity:.45;cursor:not-allowed}
 /* Fase 4 · Tablero: 4 cifras clave, estatus en una línea, el resto plegado */
 .tb-clave{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
