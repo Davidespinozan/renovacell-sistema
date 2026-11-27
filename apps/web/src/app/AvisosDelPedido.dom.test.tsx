@@ -92,4 +92,13 @@ describe('dónde se ve y quién lo puede ver', () => {
     expect(cuerpo).not.toMatch(/'doctor'|'driver'/)                           // chofer y doctor no la usan
     expect(cuerpo).toContain("left(c.to_address, 1) || '•••'"); expect(cuerpo).toContain("'•••• ' || right(")   // el destino nunca va completo
   })
+  it('el aviso de pago por WhatsApp también aparece: se liga por el correo espejo, no por el pedido en la clave', () => {
+    // La 1.ª versión buscaba 'wa:<evento>:<pedido>'; el de pago lleva el identificador del PAGO y no salía en la venta.
+    const sql = readFileSync(resolve(__dirname, '../../../../supabase/migrations/20270408080000_avisos_del_pedido_pago.sql'), 'utf8')
+    const cuerpo = sql.slice(sql.indexOf('create or replace function public.avisos_del_pedido'))
+    expect(cuerpo).toContain("a.event_key in (select 'wa:' || c2.event_key from public.comm_outbox c2 where c2.order_id = p_order)")
+    expect(cuerpo).not.toContain("'wa:pedido_recibido:' ||")
+    expect(cuerpo).not.toMatch(/\b(insert|update|delete)\s/i)
+    expect(cuerpo).toContain("v_rol = 'pos' and"); expect(cuerpo).toContain('public._cx0c_venta_pos_propia(o.id)')   // misma visibilidad
+  })
 })
