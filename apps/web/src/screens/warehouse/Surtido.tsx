@@ -13,12 +13,15 @@ import { useProducts } from '../../data/hooks/useProducts'
 import { planSurtido, canFulfill, surtirPedido, mapaEnCustodia, type ItemPlan } from '../../data/ops/surtir'
 import { useOpId } from '../../data/hooks/useOpId'
 import { isSurtible } from '../../data/ops/seguimiento'
-import { entregaDelPedido, esperaSalida, fechaCorta } from '../../data/ops/entrega'
+import { entregaDelPedido, esperaSalida, fechaCorta, salidaDePedido } from '../../data/ops/entrega'
+import { useCorteEntrega } from '../../data/hooks/useCorteEntrega'
+import { ListaDetalle } from '../../app/ListaDetalle'
+import { capitalizarNombre } from '../../lib/nombres'
+import { orderAddress } from '../../data/ops/shippingAddress'
 import { hoyNegocio, sumarDias } from '../../data/periodo'
 import { ProgramarSalida } from '../../app/ProgramarSalida'
 import { useOrderMoney } from '../../data/hooks/useMoney'
 import { creditoAbierto, creditoVencido } from '../../data/ops/moneyView'
-import { statusView } from '../doctor/orderStatus'
 import type { ProductSafe } from '../../data/types'
 import { cantidadVista, esMediaCaja } from '../../lib/cajas'
 import { clienteDePedido } from '../../data/mock/profiles'   // el nombre del cliente junto al folio (Almacén lo pidió)
@@ -35,6 +38,7 @@ export function Surtido() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [batchResult, setBatchResult] = useState<{ ok: number; fail: number; errors: string[] } | null>(null)
   const [batchBusy, setBatchBusy] = useState(false)
+  const corte = useCorteEntrega()
 
   const byId = useMemo(() => {
     const m: Record<string, ProductSafe | undefined> = {}
@@ -134,52 +138,66 @@ export function Surtido() {
               <Icon name="check" /> Seleccionar todos los surtibles ({allFulfillable.length})
             </button>
           )}
-          {pending.map((o) => {
-            const sv = statusView(o.status)
-            const canDo = fulfillable[o.id]
-            const isSel = selected.has(o.id) && canDo
-            return (
-              <div key={o.id} className="card" style={isSel ? { borderColor: 'var(--green-deep)', boxShadow: '0 0 0 1px var(--green-deep)' } : undefined}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                  {canDo && (
-                    <input
-                      type="checkbox"
-                      checked={isSel}
-                      onChange={() => toggle(o.id)}
-                      aria-label={`Seleccionar ${o.external_ref}`}
-                      style={{ width: 17, height: 17, accentColor: 'var(--green-deep)', cursor: 'pointer' }}
-                    />
-                  )}
-                  <span className="mono" style={{ fontSize: 14 }}>{o.external_ref}</span>
-                  <b style={{ fontSize: 14 }} data-testid="surtido-cliente">{clienteDePedido(o).name}</b>
-                  {(() => {
-                    // Un pedido liberado por CRÉDITO no está pagado: se surte, pero Almacén lo ve.
-                    const d = byOrder[o.id]
-                    if (!d || !creditoAbierto(d)) return null
-                    return <span className={'pill ' + (creditoVencido(d) ? 'p-dang' : 'p-warn')} title={`Saldo ${d.saldo}`}>
-                      {creditoVencido(d) ? 'Crédito vencido' : 'A crédito · sin pagar'}
-                    </span>
-                  })()}
-                  <span className="pill p-warn"><span className="d" /> Por preparar</span>
-                  {!canDo && (esSobrePedido(o) ? <span className="pill p-warn" data-testid="surtido-esperando">Esperando mercancía · sobre pedido</span> : <span className="pill p-dang">Sin stock suficiente</span>)}
-                  {canDo && esSobrePedido(o) && <span className="pill p-ok" data-testid="surtido-ya-llego">Sobre pedido · ya llegó, se puede surtir</span>}
-                  <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(o.created_at)}</span>
-                </div>
-                <EntregaPill e={entregaDelPedido(o.shipping_meta)} />
-                {o.items.map((it) => (
-                  <div key={it.id} className="coitem">
-                    <span>
-                      {byId[it.product_id ?? '']?.name ?? 'Producto'} <span style={{ color: 'var(--ink-3)' }}>×{cantidadVista(byId[it.product_id ?? ''], it.qty)}</span>{/* CAJAS-MEDIOS */}
-                    </span>
-                    <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
+          {/* LISTA + DETALLE (27 nov 2026): antes era una tarjeta grande por pedido, con el mismo botón repetido. Ahora los
+              pedidos van en renglones cortos y el elegido se abre al lado (en el celular, debajo de su renglón). La casilla
+              para surtir varios de una vez sigue en cada renglón. */}
+          <ListaDetalle
+            testid="surtido" items={pending} clave={(o) => o.id}
+            renglon={(o) => {
+              const canDo = fulfillable[o.id]; const e = entregaDelPedido(o.shipping_meta); const sal = e ? salidaDePedido(e, hoyNegocio(), corte) : null
+              const d = orderAddress(o.shipping_meta, null)
+              const lugar = e?.tipo === 'recoge' || e?.tipo === 'mostrador' ? 'Recoge en sucursal' : [d?.city, d?.state].filter(Boolean).join(', ')
+              return {
+                titulo: capitalizarNombre(clienteDePedido(o).name) || clienteDePedido(o).name,
+                sub: <><span className="mono">{o.external_ref}</span> · {o.items.length} producto{o.items.length === 1 ? '' : 's'}{lugar ? ` · ${lugar}` : ''}</>,
+                nota: sal ? `${sal.etiqueta}${e?.paqueteria && e.tipo === 'foraneo' ? ` · ${e.texto}` : e?.tipo === 'local' ? ' · chofer' : ''}` : undefined,
+                aviso: sal?.cuando === 'atrasado',
+                pill: !canDo ? (esSobrePedido(o) ? { texto: 'Espera mercancía', clase: 'p-warn' } : { texto: 'Sin stock', clase: 'p-dang' }) : { texto: 'Por preparar', clase: 'p-warn' },
+                antes: canDo ? <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggle(o.id)} aria-label={`Seleccionar ${o.external_ref}`} className="md-casilla" /> : <span className="md-casilla md-casilla--no" aria-hidden />,
+              }
+            }}
+            detalle={(o) => {
+              const canDo = fulfillable[o.id]
+              return (
+                <div className="hoy-detalle-cuerpo" data-testid={`surtido-detalle-${o.id}`}>
+                  <div className="hoy-detalle-cab">
+                    <div className="hoy-detalle-nombre" data-testid="surtido-cliente">{capitalizarNombre(clienteDePedido(o).name) || clienteDePedido(o).name}</div>
+                    <div className="hoy-detalle-sub">
+                      <span className="mono">{o.external_ref}</span>
+                      {(() => {
+                        // Un pedido liberado por CRÉDITO no está pagado: se surte, pero Almacén lo ve.
+                        const d = byOrder[o.id]
+                        if (!d || !creditoAbierto(d)) return null
+                        return <span className={'pill ' + (creditoVencido(d) ? 'p-dang' : 'p-warn')} title={`Saldo ${d.saldo}`}>
+                          {creditoVencido(d) ? 'Crédito vencido' : 'A crédito · sin pagar'}
+                        </span>
+                      })()}
+                      {!canDo && (esSobrePedido(o) ? <span className="pill p-warn" data-testid="surtido-esperando">Esperando mercancía · sobre pedido</span> : <span className="pill p-dang">Sin stock suficiente</span>)}
+                      {canDo && esSobrePedido(o) && <span className="pill p-ok" data-testid="surtido-ya-llego">Sobre pedido · ya llegó, se puede surtir</span>}
+                      <span>Pedido el {fmtDate(o.created_at)}</span>
+                    </div>
                   </div>
-                ))}
-                <button className="btn" type="button" style={{ marginTop: 12 }} onClick={() => setActive(o)}>
-                  <Icon name="layers" /> Preparar este pedido
-                </button>
-              </div>
-            )
-          })}
+                  <EntregaPill e={entregaDelPedido(o.shipping_meta)} />
+                  <div>
+                    <h4>Productos a empacar</h4>
+                    {o.items.map((it) => (
+                      <div key={it.id} className="coitem">
+                        <span>
+                          {byId[it.product_id ?? '']?.name ?? 'Producto'} <span style={{ color: 'var(--ink-3)' }}>×{cantidadVista(byId[it.product_id ?? ''], it.qty)}</span>{/* CAJAS-MEDIOS */}
+                        </span>
+                        <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="hoy-detalle-accion">
+                    <button className="btn" type="button" onClick={() => setActive(o)} data-testid={`surtido-preparar-${o.id}`}>
+                      <Icon name="layers" /> Preparar este pedido
+                    </button>
+                  </div>
+                </div>
+              )
+            }}
+          />
         </>
       )}
 

@@ -52,6 +52,21 @@ describe('ENT-3 · Empaque', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Listo para recoger' })).toBeInTheDocument())
     expect(h.markShipped).toHaveBeenCalledWith('S1', { method: 'recoge', carrier: null, tracking: null })
   })
+  it('LISTA + DETALLE: los pedidos van en renglones y cada uno abre con SU botón (el primero ya viene abierto)', () => {
+    h.orders = [
+      pedido('S1', '2026-10-20T10:00Z', ent({ opcion: 'local_chofer', tipo: 'local', paqueteria: 'chofer', texto: 'Entrega local', salida: '2026-10-21' })),
+      pedido('S2', '2026-10-20T11:00Z', ent({ salida: '2026-10-22' })),
+    ]
+    render(<Cola />)
+    expect(screen.getByTestId('cola-lista').querySelectorAll('.md-renglon')).toHaveLength(2)
+    expect(screen.getAllByTestId('cola-siguiente')).toHaveLength(1)                    // un solo botón a la vista, no uno por pedido
+    expect(screen.getByTestId('cola-detalle-S1')).toBeTruthy()
+    expect(screen.getByTestId('cola-siguiente')).toHaveTextContent('Entregar al chofer')
+    fireEvent.click(screen.getByTestId('cola-abrir-S2'))
+    expect(screen.getByTestId('cola-detalle-S2')).toBeTruthy(); expect(screen.queryByTestId('cola-detalle-S1')).toBeNull()
+    expect(screen.getByTestId('cola-siguiente')).toHaveTextContent('Generar guía')
+    expect(screen.getByTestId('cola-abrir-S2')).toHaveTextContent('Preparado')
+  })
   it('elegir otro método que el vendido se avisa (el cliente espera lo prometido)', () => {
     h.orders = [pedido('S2', '2026-10-20T10:00Z', ent({}))]
     render(<Cola />)

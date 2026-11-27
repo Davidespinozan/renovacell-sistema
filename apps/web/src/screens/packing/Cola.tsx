@@ -38,6 +38,8 @@ import { sinServiciosExcluidos } from '../../../../../supabase/functions/_shared
 import { PAQ_MANUALES, esPaqManual, registrarGuiaManual, urlRastreoEstafeta, validarCostoGuia, validarGuiaManual, type PaqManual } from '../../data/shipping/estafeta'
 import { listarEmpaques, medidasTexto, type Empaque } from '../../data/ops/empaques'
 import { cantidadVista } from '../../lib/cajas'
+import { ListaDetalle } from '../../app/ListaDetalle'
+import { capitalizarNombre } from '../../lib/nombres'
 import { envioDePaquete, extrasDe, extrasSinGuia, lugarDe, nombrePaqueteriaExtra, pedidoDePaquete, type EnvioExtra } from '../../data/ops/enviosExtra'   // ENVÍOS EXTRA
 
 // Destinatario REAL del pedido: sale del snapshot autoritativo del pedido
@@ -117,6 +119,7 @@ export function Cola() {
   const esDireccion = role === 'admin'
   const solicitudes = useSolicitudesCancelacion()
   const [cancelando, setCancelando] = useState<OrderWithItems | null>(null)
+  const corte = useCorteEntrega()
 
   const byId = useMemo(() => {
     const m: Record<string, ProductSafe | undefined> = {}
@@ -135,21 +138,44 @@ export function Cola() {
       {queue.length === 0 ? (
         <Vacio icono="pkg" titulo="No hay pedidos empacados pendientes de envío." pista="Surte un pedido en Almacén para que llegue aquí." />
       ) : (
-        queue.map((o) => { const sol = solicitudDe(solicitudes, o.id); return (
-          <div key={o.id} className="card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <span className="mono" style={{ fontSize: 14 }}>{o.external_ref}</span>
-              <b style={{ fontSize: 14 }}>{clienteDePedido(o).name}</b>
-              {o.status === 'shipped' ? <span className="pill p-green"><span className="d" /> Principal enviado</span> : <span className="pill p-blue"><span className="d" /> Empacado</span>}
-              <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>{fmtDate(o.created_at)}</span>
+        /* LISTA + DETALLE (27 nov 2026): antes era una tarjeta grande por pedido con tres botones cada una. Ahora los
+           pedidos van en renglones cortos y el elegido se abre al lado (en el celular, debajo de su renglón), con los
+           mismos botones de siempre. */
+        <ListaDetalle
+          testid="cola" items={queue} clave={(o) => o.id}
+          renglon={(o) => {
+            const e = entregaDe(o); const sal = e ? salidaDePedido(e, hoyLocal(), corte) : null; const env = envioVigente(shipments, o.id)
+            const d = orderAddress(o.shipping_meta, null)
+            const lugar = e?.tipo === 'recoge' || e?.tipo === 'mostrador' ? 'Recoge en sucursal' : [d?.city, d?.state].filter(Boolean).join(', ')
+            const conChofer = o.status === 'packed' && env && env.status === 'por_despachar' && env.driver_id
+            return {
+              titulo: capitalizarNombre(clienteDePedido(o).name) || clienteDePedido(o).name,
+              sub: <><span className="mono">{o.external_ref}</span> · {o.items.length} producto{o.items.length === 1 ? '' : 's'}{lugar ? ` · ${lugar}` : ''}</>,
+              nota: sal ? `${sal.etiqueta}${e?.tipo === 'foraneo' && e.paqueteria ? ` · ${NOMBRE_PAQUETERIA[e.paqueteria] ?? e.texto}` : e?.tipo === 'local' ? ' · chofer' : ''}` : undefined,
+              aviso: sal?.cuando === 'atrasado',
+              pill: solicitudDe(solicitudes, o.id) ? { texto: 'Cancelación pedida', clase: 'p-dang' } : o.status === 'shipped' ? { texto: 'Falta guía extra', clase: 'p-warn' } : conChofer ? { texto: 'Falta darle salida', clase: 'p-blue' } : { texto: 'Preparado', clase: 'p-ok' },
+            }
+          }}
+          detalle={(o) => { const sol = solicitudDe(solicitudes, o.id); return (
+          <div className="hoy-detalle-cuerpo" data-testid={`cola-detalle-${o.id}`}>
+            <div className="hoy-detalle-cab">
+              <div className="hoy-detalle-nombre">{capitalizarNombre(clienteDePedido(o).name) || clienteDePedido(o).name}</div>
+              <div className="hoy-detalle-sub">
+                <span className="mono">{o.external_ref}</span>
+                {o.status === 'shipped' ? <span className="pill p-green"><span className="d" /> Principal enviado</span> : <span className="pill p-ok">Preparado</span>}
+                <span>Pedido el {fmtDate(o.created_at)}</span>
+              </div>
             </div>
             <EntregaPill e={entregaDe(o)} />
+            <div>
+              <h4>Productos</h4>
             {o.items.map((it) => (
               <div key={it.id} className="coitem">
                 <span>{byId[it.product_id ?? '']?.name ?? 'Producto'} <span style={{ color: 'var(--ink-3)' }}>×{cantidadVista(byId[it.product_id ?? ''], it.qty)}</span></span>{/* CAJAS-MEDIOS */}
                 <span className="mono">{money((it.unit_price ?? 0) * it.qty)}</span>
               </div>
             ))}
+            </div>
             {extrasDe(o).length > 0 && (
               <div data-testid="cola-extras" style={{ marginTop: 10, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 12, display: 'grid', gap: 8 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 700 }}>{extrasDe(o).length === 1 ? '1 envío extra' : `${extrasDe(o).length} envíos extra`} · una guía por cada uno{o.status !== 'shipped' ? ' (el principal lleva lo demás)' : ''}</div>
@@ -172,7 +198,7 @@ export function Cola() {
               </div>
             ) : null })()}
             {errDespacho[o.id] && <div style={{ fontSize: 12.5, color: 'var(--danger)', marginTop: 8 }}>{errDespacho[o.id]}</div>}
-            {o.status === 'packed' && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
+            {o.status === 'packed' && <div className="md-detalle-botones">
               {(() => { const env = envioVigente(shipments, o.id); return env && env.status === 'por_despachar' && env.driver_id ? (
                 <button className="btn" type="button" disabled={!!sol || despachando === o.id} onClick={() => void despachar(o, env.id, env.driver_id!)} data-testid="cola-despachar">
                   <Icon name="truck" /> {despachando === o.id ? 'Despachando…' : 'Ya le entregué la carga: despachar'}
@@ -189,7 +215,8 @@ export function Cola() {
                 : <span style={{ marginLeft: 'auto' }}><SolicitarCancelacion orderId={o.id} folio={o.external_ref ?? o.id} className="btn ghost" /></span>)}
             </div>}
           </div>
-        ) })
+          ) }}
+        />
       )}
       {cancelando && <CancelOrderModal orderId={cancelando.id} folio={cancelando.external_ref ?? cancelando.id} requireReason actor="Administración" onClose={() => setCancelando(null)} />}
 
