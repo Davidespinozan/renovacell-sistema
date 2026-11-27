@@ -14,11 +14,13 @@ import type { OrderWithItems } from '../../data/hooks/useOrders'
 import { capitalizarNombre } from '../../lib/nombres'
 import { currentCompany } from '../../data/store/companyStore'
 import { cantidadVista, esMediaCaja } from '../../lib/cajas'
+import { QRFactura } from '../../app/NotaVenta'
+import { enlacesFactura, type EnlaceFactura } from '../../data/ops/autofactura'
 
 export const LEMA_MARCA = 'Tecnologías Antiedad'
 type EnvioRemision = { carrier?: string | null; tracking_number?: string | null; driver_id?: string | null; estimated_delivery_at?: string | null }
 
-export function RemisionView({ order, envio }: { order: OrderWithItems; envio?: EnvioRemision | null }) {
+export function RemisionView({ order, envio, enlace = null }: { order: OrderWithItems; envio?: EnvioRemision | null; enlace?: EnlaceFactura | null }) {
   const { data: products } = useProducts()
   const { data: lots } = useLots()
   const meta = (order.shipping_meta ?? {}) as { customer?: { name?: string } | null }
@@ -70,6 +72,8 @@ export function RemisionView({ order, envio }: { order: OrderWithItems; envio?: 
         <div>Recibí completo y en buen estado · Nombre y firma</div>
         <div>Fecha</div>
       </div>
+      {/* AUTOFACTURA: el cliente pide su factura con este código (la remisión es el papel que recibe con su paquete). */}
+      <QRFactura enlace={enlace} />
       <div className="rfoot">
         <div className="note">Producto regulado · trazabilidad por lote (COFEPRIS). Conserva esta remisión.</div>
         <Icon name="shield" style={{ width: 22, height: 22, color: 'var(--green-deep)' }} />
@@ -81,8 +85,18 @@ export function RemisionView({ order, envio }: { order: OrderWithItems; envio?: 
 // Botón que imprime SOLO la remisión (impresión aislada, mismo patrón que el recibo de venta y el corte).
 export function BotonRemision({ order, envio, className = 'btn ghost sm' }: { order: OrderWithItems; envio?: EnvioRemision | null; className?: string }) {
   const [imprimiendo, setImprimiendo] = useState(false)
+  // El QR necesita el enlace de la compra: se pide ANTES de imprimir y se espera poco; si no llega, la remisión sale sin QR.
+  const [enlace, setEnlace] = useState<EnlaceFactura | null>(null)
+  const [lista, setLista] = useState(false)
   useEffect(() => {
-    if (!imprimiendo) return
+    if (!imprimiendo) { setLista(false); return }
+    let vivo = true
+    const tope = setTimeout(() => { if (vivo) setLista(true) }, 2500)
+    void enlacesFactura([order.id]).then((m) => { if (!vivo) return; setEnlace(m[order.id] ?? null); clearTimeout(tope); setLista(true) })
+    return () => { vivo = false; clearTimeout(tope) }
+  }, [imprimiendo, order.id])
+  useEffect(() => {
+    if (!imprimiendo || !lista) return
     // El título de la pestaña es el nombre del PDF al guardarlo: «Remisión S…», nunca el del sistema.
     const tituloPrevio = document.title
     const fin = () => { document.title = tituloPrevio; document.body.classList.remove('printing-remision'); window.removeEventListener('afterprint', fin); setImprimiendo(false) }
@@ -94,11 +108,11 @@ export function BotonRemision({ order, envio, className = 'btn ghost sm' }: { or
       window.print()
     }))
     return () => { cancelAnimationFrame(cuadro); document.title = tituloPrevio; document.body.classList.remove('printing-remision'); window.removeEventListener('afterprint', fin) }
-  }, [imprimiendo])
+  }, [imprimiendo, lista])
   return (
     <>
       <button className={className} type="button" disabled={imprimiendo} onClick={() => setImprimiendo(true)} data-testid="imprimir-remision"><Icon name="receipt" style={{ width: 13, height: 13 }} /> Imprimir remisión</button>
-      {imprimiendo && createPortal(<div className="remision-print-root"><RemisionView order={order} envio={envio} /></div>, document.body)}
+      {imprimiendo && lista && createPortal(<div className="remision-print-root"><RemisionView order={order} envio={envio} enlace={enlace} /></div>, document.body)}
     </>
   )
 }

@@ -33,6 +33,7 @@ import { statusView, seSurteSinPago } from '../doctor/orderStatus'
 import { esRecoge } from '../../data/ops/seguimiento'
 import { ExportButton } from '../../app/ExportButton'
 import { CancelOrderModal } from '../../app/CancelOrderModal'
+import { BotonNotaVenta } from '../../app/NotaVenta'
 import { GuiaManualVoid } from './GuiaManualVoid'
 import type { ProductSafe, Profile } from '../../data/types'
 import { enPeriodo, hoyNegocio, rangoPeriodo, type PeriodoRapido } from '../../data/periodo'
@@ -433,10 +434,11 @@ function SaleDetail({ order, productsById, clientName, channel, dinero = null, o
           <button className="mclose" type="button" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="mbody">
-          <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
             <span className={'pill ' + p.pill}>{p.label}</span>
             <span className={'pill ' + sv.pill}>{sv.label}</span>
             {order.invoice_requested && <span className="pill p-blue"><FileText size={12} /> CFDI solicitado</span>}
+            <span style={{ marginLeft: 'auto' }}><BotonNotaVenta order={order} /></span>
           </div>
 
           <EntregaDeLaVenta order={order} />

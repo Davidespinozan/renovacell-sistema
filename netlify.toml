@@ -93,6 +93,13 @@
   status = 200
   force = true
 
+# 2f) AUTOFACTURA · /factura: el cliente escanea el QR de su recibo y pide su factura (página propia, sin sesión).
+[[redirects]]
+  from = "/factura"
+  to = "/factura.html"
+  status = 200
+  force = true
+
 # 2d) INVITACIONES · /invitacion: el cliente existente crea su cuenta (página propia: título del negocio).
 [[redirects]]
   from = "/invitacion"

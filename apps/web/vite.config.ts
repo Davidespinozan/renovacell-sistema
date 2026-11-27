@@ -38,7 +38,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 700, // recharts es un chunk lazy grande, esperado
     rollupOptions: {
       // Dos páginas, una aplicación: el sistema y el enlace de contacto (su propio título y vista previa al compartir).
-      input: { main: 'index.html', contacto: 'contacto.html', invitacion: 'invitacion.html' },
+      input: { main: 'index.html', contacto: 'contacto.html', invitacion: 'invitacion.html', factura: 'factura.html' },
       output: {
         // Separa librerías pesadas en chunks propios (mejor cacheo y carga). PERF: como función y por ruta de
         // node_modules: la forma de objeto metía react-dom/scheduler en `charts`, y el index.html cargaba recharts

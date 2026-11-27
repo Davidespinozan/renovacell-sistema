@@ -12,6 +12,8 @@ import { FiscalFields } from '../../app/FiscalFields'
 import { customerFiscal, upsertCustomerFiscal } from '../../data/store/customersStore'
 import { emptyFiscalProfile, isFiscalProfileComplete, normalizeFiscalProfile, type FiscalProfile } from '../../data/ops/fiscal'
 import { enviarReciboWhatsApp, imprimirVenta, VentaTicketPrint } from './ventaRecibo'
+import { useEnlaceFactura } from '../../data/ops/autofactura'   // QR para pedir la factura
+import { BotonNotaVenta } from '../../app/NotaVenta'
 import { useProducts, isActiveProduct } from '../../data/hooks/useProducts'
 import { useLots } from '../../data/hooks/useLots'
 import { useDoctors } from '../../data/hooks/useDoctors'
@@ -269,6 +271,8 @@ export function Caja() {
     }
   }
 
+  // QR para pedir la factura: el de la venta recién hecha o el de la que se reimprime.
+  const enlaceRecibo = useEnlaceFactura(done?.id ?? reprint?.order.id ?? null)
   // Reimprime el recibo de una venta del turno: monta su ticket y abre el diálogo.
   const reimprimir = (v: VentaTurno) => {
     setReprint(v)
@@ -472,7 +476,7 @@ export function Caja() {
       </div>
 
       {!done && reprint && (
-        <VentaTicketPrint order={reprint.order} productName={productName} unidades={unidadesRecibo} pago={reprint.pago} clientName={reprint.clientName} />
+        <VentaTicketPrint order={reprint.order} productName={productName} unidades={unidadesRecibo} pago={reprint.pago} clientName={reprint.clientName} enlace={enlaceRecibo} />
       )}
 
       {pedidoAbierto && client && (
@@ -509,7 +513,8 @@ export function Caja() {
                 </p>
                 <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
                   <button className="btn ghost" type="button" onClick={imprimirVenta}><Icon name="download" /> Imprimir recibo</button>
-                  <button className="btn ghost" type="button" onClick={() => enviarReciboWhatsApp(done, productName, lastPago, (() => { const t = clienteDePedido(done).phone; return t && t !== '—' ? t : undefined })(), unidadesRecibo)}>
+                  <BotonNotaVenta order={done} className="btn ghost" />
+                  <button className="btn ghost" type="button" onClick={() => enviarReciboWhatsApp(done, productName, lastPago, (() => { const t = clienteDePedido(done).phone; return t && t !== '—' ? t : undefined })(), unidadesRecibo, enlaceRecibo)}>
                     <Icon name="chat" /> Enviar por WhatsApp
                   </button>
                   <button className="btn" type="button" onClick={() => setDone(null)}>Nueva venta</button>
@@ -517,7 +522,7 @@ export function Caja() {
               </div>
             </div>
           </div>
-          <VentaTicketPrint order={done} productName={productName} unidades={unidadesRecibo} pago={lastPago} clientName={clientNameFor(done)} />
+          <VentaTicketPrint order={done} productName={productName} unidades={unidadesRecibo} pago={lastPago} clientName={clientNameFor(done)} enlace={enlaceRecibo} />
         </div>
       )}
     </div>

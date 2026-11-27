@@ -588,6 +588,20 @@ a.btn,a.btn:hover{text-decoration:none}
   body.printing-remision .remision-print-root{page:remision;padding:16mm 15mm}
   body.printing-remision .recibo .rhead{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+/* NOTA DE VENTA y QR para pedir la factura (27 nov 2026). El QR va igual en la nota, la remisión y el ticket. */
+.nota-venta .nv-num{text-align:right}
+.nota-venta tfoot .nv-total{font-size:17px}
+.nota-venta .nv-letras{font-size:11.5px;color:var(--ink-3);padding:8px 0 12px}
+.qr-factura{display:flex;align-items:center;gap:16px;margin:6px 26px 18px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;break-inside:avoid}
+.qr-factura--compacto{margin:12px 0 4px;padding:10px 12px;gap:12px}
+.qr-factura .codigo-qr{flex:none;display:block}
+.qr-factura-tx{display:grid;gap:3px;font-size:12px;line-height:1.45;color:var(--ink-2);min-width:0}
+.qr-factura-tx > b{font-size:14px;color:var(--ink)}
+.nv-overlay{align-items:start;overflow:auto}
+.nv-ventana{width:min(640px,96vw);margin:auto;display:grid;gap:12px}
+.nv-ventana .recibo{animation:none}
+.nv-acciones{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.nv-acciones .btn.ghost{background:var(--cp-surface)}
 .recibo .rfirma{display:flex;gap:28px;padding:34px 26px 6px}
 .recibo .rfirma>div{border-top:1px solid #1a1f1c;padding-top:6px;font-size:11px;color:#5b665d}
 .recibo .rfirma>div:first-child{flex:2}.recibo .rfirma>div:last-child{flex:1}

@@ -25,8 +25,10 @@ describe('Empaque', () => {
     renderWithRole(<BotonRemision order={order as never} envio={{ carrier: 'DHL', tracking_number: '8664197986' }} />)
     expect(document.querySelector('.remision-print-root')).toBeNull()
     fireEvent.click(screen.getByTestId('imprimir-remision'))
-    const doc = document.querySelector('.remision-print-root') as HTMLElement
+    // Antes de pintar la hoja se pide el enlace del QR de la factura (aquí no hay servidor: sale sin QR, pero sale).
     await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1))   // espera a que la hoja esté pintada
+    const doc = document.querySelector('.remision-print-root') as HTMLElement
+    expect(doc.querySelector('[data-testid="qr-factura"]')).toBeNull()
     expect(document.body.classList.contains('printing-remision')).toBe(true)
     expect(doc.textContent).toContain(LEMA_MARCA); expect(doc.textContent).toContain('Dra. Prueba'); expect(doc.textContent).toContain('C.P. 82000')
     expect(doc.textContent).toContain('DHL · guía 8664197986'); expect(doc.textContent).toContain('2 pzas')
