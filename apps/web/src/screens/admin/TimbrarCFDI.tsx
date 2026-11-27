@@ -28,7 +28,17 @@ export function TimbrarCFDI({ docId, modo, onCambio, cliente = clientePorDefecto
   if (res) return (
     <div className="sysnote" data-testid="cfdi-resultado" style={{ display: 'block', ...(res.status === 'timbrado' ? { background: 'var(--ok-bg)', color: 'var(--green-deep)' } : {}) }}>
       <b>{res.message ?? res.error}</b>
-      {res.status === 'timbrado' && res.correo_enviado && <div>Se envió al correo de facturación del cliente.</div>}
+      {res.status === 'timbrado' && res.correo_enviado && <div data-testid="cfdi-correo-ok">Se envió al correo de facturación del cliente.</div>}
+      {res.status === 'timbrado' && !res.correo_enviado && (
+        <div data-testid="cfdi-correo-no" style={{ color: 'var(--warn)' }}>
+          {res.correo_falta ? 'El cliente no dejó correo: la factura NO se le ha enviado.' : 'No se confirmó el envío por correo: la factura puede NO haberle llegado al cliente.'} Mándasela aquí abajo con «Enviar factura» o «Enviar por WhatsApp».
+        </div>
+      )}
+      {res.status === 'fallido' && (
+        <div data-testid="cfdi-que-hacer" style={{ marginTop: 6, fontWeight: 400 }}>
+          No se emitió ninguna factura. Corrige lo que indica y vuelve a intentarlo: los datos del cliente (RFC, nombre, régimen, código postal) se cambian en «Datos fiscales del pedido»; los del producto, en «Revisión fiscal».
+        </div>
+      )}
       {res.faltantes?.length ? <ul style={{ margin: '6px 0 0 16px' }}>{res.faltantes.map((f) => <li key={f}>{f}</li>)}</ul> : null}
     </div>
   )

@@ -8,7 +8,7 @@ import { describe, it, expect, vi } from 'vitest'
 import {
   clasificarRespuesta, uuidValido, sanitiza, timbrarEnPAC, buscarPorSerieFolio,
   buscarPorOrderNumber, consultarEstatusSAT, construirCFDI, ConstruccionFiscalPendiente,
-  TIMEOUT_PAC_MS, PAGINA_MAX_REGISTROS, PAGINAS_MAX,
+  TIMEOUT_PAC_MS, PAGINA_MAX_REGISTROS, PAGINAS_MAX, motivoProveedor,
 } from '../../../../../supabase/functions/_shared/pac'
 
 const UUID = 'a1b2c3d4-1111-2222-3333-444455556666'
@@ -53,6 +53,22 @@ describe('clasificarRespuesta · la tabla congelada', () => {
                         { Uuid: '00000000-0000-0000-0000-000000000000' }]) {
       expect(clasificarRespuesta(200, body)).toMatchObject({ clase: 'incierto', code: 'respuesta_sin_uuid' })
     }
+  })
+  it('400 con detalle por campo → el motivo dice QUÉ corregir, no solo «la solicitud no es válida»', () => {
+    const r = clasificarRespuesta(400, { Message: 'La solicitud no es válida.', ModelState: {
+      'cfdiToCreate.Receiver.Name': ['El nombre del receptor no coincide con el RFC.'],
+      'cfdiToCreate.Receiver.TaxZipCode': ['El código postal no corresponde al RFC.', 'El nombre del receptor no coincide con el RFC.'] } })
+    expect(r).toMatchObject({ clase: 'fallido', code: 'validacion' })
+    expect(r.message).toBe('El nombre del receptor no coincide con el RFC. · El código postal no corresponde al RFC.')   // sin repetidos
+    expect(r.message).not.toMatch(/[{}\[\]]/)                                                                           // nunca JSON crudo
+  })
+  it('el motivo: detalle primero; sin detalle, el mensaje general; sin nada, vacío; nunca credenciales', () => {
+    expect(motivoProveedor({ ModelState: { a: ['Uno'], b: 'Dos' } })).toBe('Uno · Dos')
+    expect(motivoProveedor({ Message: 'Solo general' })).toBe('Solo general')
+    expect(motivoProveedor({ Message: 'General', ModelState: {} })).toBe('General')
+    expect(motivoProveedor({})).toBe(''); expect(motivoProveedor(null)).toBe('')
+    expect(motivoProveedor({ ModelState: { x: ['Authorization: Basic QUJDREVGRw=='] } })).not.toContain('QUJDREVGRw')
+    expect(motivoProveedor({ ModelState: { x: ['y'.repeat(2000)] } }).length).toBeLessThanOrEqual(480)
   })
   it('400 → fallido (validación demostrada, sin efecto)', () => {
     expect(clasificarRespuesta(400, { Message: 'RFC inválido' }))

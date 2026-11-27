@@ -60,13 +60,31 @@ function leeUuid(d: any): string | undefined {
   return uuidValido(u) ? String(u).trim() : undefined
 }
 
+// MOTIVO DEL RECHAZO (27 nov 2026, dueño: «¿le avisa si hubo un problema con la factura y si necesita modificar datos?»).
+// El proveedor puede mandar un mensaje general («La solicitud no es válida») Y el detalle por campo (`ModelState`:
+// campo → lista de textos). Antes, con los dos presentes, solo se leía el general y no se sabía QUÉ corregir. Ahora el
+// detalle va primero; el general solo cuando no hay detalle. Sin detalle ni mensaje, cadena vacía (cada rama pone la suya).
+// deno-lint-ignore no-explicit-any
+export function motivoProveedor(d: any): string {
+  const detalles: string[] = []
+  const junta = (v: unknown) => {
+    if (typeof v === 'string') { const t = v.trim(); if (t && !detalles.includes(t)) detalles.push(t) }
+    else if (Array.isArray(v)) v.forEach(junta)
+    else if (v && typeof v === 'object') Object.values(v as Record<string, unknown>).forEach(junta)
+  }
+  junta(d?.ModelState ?? d?.modelState)
+  if (detalles.length) return sanitiza(detalles.join(' · '), 480)
+  const general = d?.Message ?? d?.message
+  return typeof general === 'string' ? sanitiza(general.trim()) : general == null ? '' : sanitiza(general)
+}
+
 // CLASIFICACIÓN — tabla congelada del diseño. Pura y exhaustivamente probada.
 // Regla que la gobierna: un resultado solo es `fallido` cuando se DEMUESTRA que
 // el PAC no produjo efecto. Todo lo demás es `incierto`.
 export function clasificarRespuesta(status: number, body: unknown): ResultadoPAC {
   // deno-lint-ignore no-explicit-any
   const d = body as any
-  const msg = sanitiza(d?.Message ?? d?.message ?? d?.ModelState ?? '')
+  const msg = motivoProveedor(d)
 
   if (status >= 200 && status < 300) {
     const uuid = leeUuid(d)

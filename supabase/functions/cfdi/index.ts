@@ -95,15 +95,24 @@ Deno.serve(conCors(async (req) => {
       return json(202, { status: 'incierto', serie: r.serie, folio: r.folio, message: 'Facturama respondió pero no se pudo guardar el resultado. Usa "Conciliar con Facturama"; no vuelvas a timbrar.' })
     }
     let correo = false
-    if (res.clase === 'timbrado' && res.providerRef && /@/.test(prep.receiver?.email_facturacion ?? '')) {
+    const hayCorreo = /@/.test(prep.receiver?.email_facturacion ?? '')
+    if (res.clase === 'timbrado' && res.providerRef && hayCorreo) {
       try {
         const qs = new URLSearchParams({ CfdiType: 'issued', CfdiId: String(res.providerRef), Email: prep.receiver.email_facturacion })
         const m = await fetch(`${deps.base}/Cfdi?${qs.toString()}`, { method: 'POST', headers: { Authorization: deps.auth, Accept: 'application/json' }, signal: AbortSignal.timeout(15_000) })
         correo = m.ok && ((await m.json().catch(() => ({}))) as { success?: boolean }).success === true
       } catch { /* el CFDI ya existe; el envío se puede repetir desde la pantalla */ }
+      // Rastro del envío automático, igual que el manual (`cfdi-send`). Nunca tumba la respuesta: la factura ya existe.
+      try {
+        // Mismo recurso que el envío manual: el folio del pedido (se busca; si no se pudo, el identificador).
+        const { data: fd } = await admin.from('fiscal_documents').select('order_id').eq('id', doc).maybeSingle()
+        const { data: ped } = fd?.order_id ? await admin.from('orders').select('external_ref').eq('id', fd.order_id).maybeSingle() : { data: null }
+        await caller.rpc('log_audit', { p_action: correo ? 'CFDI enviado' : 'CFDI envío fallido', p_resource: ped?.external_ref ?? fd?.order_id ?? doc,
+          p_detail: JSON.stringify({ to: prep.receiver.email_facturacion, at: new Date().toISOString(), result: correo ? 'ok' : 'error', origen: 'al_timbrar' }), p_actor_name: 'Administración' })
+      } catch { /* sin rastro: no cambia lo que pasó */ }
     }
     const http = res.clase === 'timbrado' ? 200 : res.clase === 'fallido' ? 422 : 202
-    return json(http, { status: res.clase, uuid: res.uuid ?? null, serie: r.serie, folio: r.folio, entorno: ent.entorno, total: a.total, correo_enviado: correo,
+    return json(http, { status: res.clase, uuid: res.uuid ?? null, serie: r.serie, folio: r.folio, entorno: ent.entorno, total: a.total, correo_enviado: correo, correo_falta: res.clase === 'timbrado' && !hayCorreo,
       message: res.clase === 'timbrado' ? `CFDI ${r.serie}-${r.folio} timbrado.` : res.clase === 'fallido' ? `Facturama lo rechazó: ${sanitiza(res.message ?? '')}` : 'No hubo respuesta clara de Facturama: NO vuelvas a timbrar; usa "Conciliar con Facturama".' })
   }
 

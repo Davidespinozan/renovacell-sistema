@@ -6,7 +6,7 @@ export interface RespuestaCfdi {
   status?: string; listo?: boolean; configurado?: boolean; entorno?: 'sandbox' | 'produccion' | null
   faltantes?: string[]; requiere_forma_tarjeta?: boolean; message?: string; error?: string
   resumen?: { conceptos: number; subtotal: number; iva: number; total: number; forma_pago: string } | null
-  uuid?: string | null; serie?: string; folio?: string; correo_enviado?: boolean
+  uuid?: string | null; serie?: string; folio?: string; correo_enviado?: boolean; correo_falta?: boolean
   // FACTURA GLOBAL (26 nov 2026)
   ventas?: number; ventas_total?: number; globales?: GlobalMes[]
 }
