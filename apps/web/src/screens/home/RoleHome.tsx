@@ -291,7 +291,7 @@ export function HomeAlmacen({ etiqueta = 'Almacén y empaque' }: { etiqueta?: st
     { key: 'cola', label: 'Por enviar', icon: 'pkg' },
   ])
   return (
-    <div className="rh" data-testid="home-almacen">
+    <div className="rh rh--almacen" data-testid="home-almacen">
       {fuentes}
       <Bienvenida nombre={user?.name ?? ''} avatarUrl={user?.avatarUrl} titulo={saludo(user?.name)} etiqueta={etiqueta}
         detalle="Lo de hoy, en una sola pantalla: prepara, envía y lo demás pendiente." />

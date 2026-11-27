@@ -26,6 +26,9 @@ import { useAgendaEntregas } from '../logistics/AgendaEntregas'
 import { useRole } from '../../auth/RoleContext'
 import type { ProductSafe, Shipment } from '../../data/types'
 import { cantidadVista } from '../../lib/cajas'
+import { capitalizarNombre } from '../../lib/nombres'
+import { Hoja } from '../../app/Hoja'
+import { useAnchoMinimo } from '../../app/useAnchoMinimo'
 
 const hoyLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mazatlan', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 const diaLocal = (iso: string | null | undefined) => (iso ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mazatlan', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso)) : '')
@@ -61,7 +64,7 @@ export function HoyAlmacen() {
   const corte = useCorteEntrega()
   // FILA DEL DÍA (27 nov 2026) · el Inicio muestra TODO lo que le toca a Almacén, agrupado por cuándo sale: también lo
   // que ya tiene chofer y espera salida (antes desaparecía de aquí) y lo que espera a que el cliente lo recoja.
-  const [filtro, setFiltro] = useState<'todos' | 'preparar' | 'salir' | 'recoger'>('todos')
+  const [filtro, setFiltro] = useState<'todos' | 'atrasados' | 'preparar' | 'salir' | 'recoger'>('todos')
   const [despachando, setDespachando] = useState<string | null>(null)
   const [errDespacho, setErrDespacho] = useState<Record<string, string>>({})
   const despachar = async (o: OrderWithItems, envio: Shipment) => {
@@ -85,8 +88,12 @@ export function HoyAlmacen() {
   const nPreparar = casos.filter((c) => c.__accion.tipo === 'preparar').length
   const nSalir = casos.length - nPreparar   // preparados: por asignar envío o con chofer esperando salida
   const recoger = useMemo(() => paraRecoger(orders, (id) => !!envioVigente(shipments, id)), [orders, shipments])
-  const visibles = filtro === 'todos' ? casos : filtro === 'preparar' ? casos.filter((c) => c.__accion.tipo === 'preparar') : filtro === 'salir' ? casos.filter((c) => c.__accion.tipo !== 'preparar') : []
-  const grupos = agruparPorSalida(visibles, (o) => grupoDeSalida(entregaDe(o), hoy, corte))
+  const atrasado = (o: OrderWithItems) => grupoDeSalida(entregaDe(o), hoy, corte).cuando === 'atrasado'
+  const nAtrasados = casos.filter(atrasado).length
+  const visibles = filtro === 'todos' ? casos : filtro === 'atrasados' ? casos.filter(atrasado) : filtro === 'preparar' ? casos.filter((c) => c.__accion.tipo === 'preparar') : filtro === 'salir' ? casos.filter((c) => c.__accion.tipo !== 'preparar') : []
+  // Los atrasados van en UN solo grupo (antes: un grupito por cada día y paquetería); cada renglón dice cuándo debió salir.
+  const grupos = agruparPorSalida(visibles, (o) => { const g = grupoDeSalida(entregaDe(o), hoy, corte); return g.cuando === 'atrasado' ? { titulo: 'Ya pasó su fecha de salida', cuando: g.cuando } : g })
+  const debioSalir = (o: OrderWithItems) => { const g = grupoDeSalida(entregaDe(o), hoy, corte); return g.cuando === 'atrasado' ? g.titulo.replace(/ antes de las [^·]+/, ' ').replace(/\s+/g, ' ').trim() : null }
   const verRecoger = (filtro === 'todos' || filtro === 'recoger') && recoger.length > 0
   const total = casos.length + recoger.length
   const guiasHoy = shipments.filter((s) => s.carrier && s.tracking_number && diaLocal(s.created_at) === hoy)
@@ -94,7 +101,70 @@ export function HoyAlmacen() {
   const rec = recolecciones[0]
 
   const chip = (clave: typeof filtro, texto: string, n: number) => (
-    <button type="button" className={'fchip' + (filtro === clave ? ' on' : '')} aria-pressed={filtro === clave} onClick={() => setFiltro(clave)} data-testid={`hoy-filtro-${clave}`}>{texto} <b>{n}</b></button>
+    <button type="button" className={'fchip' + (clave === 'atrasados' ? ' fchip--aviso' : '') + (filtro === clave ? ' on' : '')} aria-pressed={filtro === clave} onClick={() => setFiltro(clave)} data-testid={`hoy-filtro-${clave}`}>{texto} <b>{n}</b></button>
+  )
+  // LISTA + DETALLE (27 nov 2026, dueño: «¿ya se ve moderna?» — todavía no): había una tarjeta enorme por pedido, con su
+  // barra de color y el mismo botón repetido 41 veces, y un tercio de la pantalla vacío. Ahora los pedidos van en UNA
+  // lista de renglones cortos y el pedido elegido se abre al lado (en el celular, en una hoja) con sus productos, su
+  // dirección y su botón. Alberto sigue viendo el pedido completo en la misma pantalla y cada botón hace lo de siempre.
+  type Caso = (typeof casos)[number]
+  const ancho = useAnchoMinimo(1000)
+  const [sel, setSel] = useState<string | null>(null)
+  const claves = [...visibles.map((o) => o.id), ...(verRecoger ? recoger.map((o) => 'r:' + o.id) : [])]
+  const elegido = sel && claves.includes(sel) ? sel : ancho ? claves[0] ?? null : null   // en computadora siempre hay uno abierto
+  const pedido = elegido && !elegido.startsWith('r:') ? visibles.find((o) => o.id === elegido) ?? null : null
+  const porRecoger = elegido && elegido.startsWith('r:') ? recoger.find((o) => 'r:' + o.id === elegido) ?? null : null
+  const nombreDe = (o: OrderWithItems) => capitalizarNombre(((o.shipping_meta ?? {}) as { customer?: { name?: string } | null }).customer?.name) || 'Cliente'
+  const lugarDe = (o: OrderWithItems) => {
+    const ent = entregaDe(o)
+    if (ent?.tipo === 'recoge' || ent?.tipo === 'mostrador') return 'Recoge en sucursal'
+    const d = orderAddress(o.shipping_meta, null)
+    return [d?.city, d?.state].filter(Boolean).join(', ') || 'Sin dirección'
+  }
+  const pasoDe = (o: Caso) => (o.__accion.tipo === 'preparar' ? { texto: 'Por preparar', pill: 'p-warn' } : o.__accion.tipo === 'despacho' ? { texto: 'Falta darle salida', pill: 'p-blue' } : { texto: 'Preparado', pill: 'p-ok' })
+  // En el celular el detalle es una hoja: se cierra antes de abrir la ventana de la acción (no se enciman dos capas).
+  const accion = (o: Caso, que: 'preparar' | 'enviar') => { if (!ancho) setSel(null); if (que === 'preparar') setPreparar(o); else setEnviar(o) }
+  const boton = (o: Caso) => {
+    const ent = entregaDe(o); const envio = envioDe[o.id]
+    return o.__accion.tipo === 'preparar'
+      ? <button className="btn hoy-accion" type="button" onClick={() => accion(o, 'preparar')} data-testid={`hoy-preparar-${o.id}`}><Icon name="layers" /> Preparar pedido</button>
+      : o.__accion.tipo === 'despacho' && envio
+      ? <button className="btn hoy-accion" type="button" disabled={despachando === o.id} onClick={() => void despachar(o, envio)} data-testid={`hoy-despachar-${o.id}`}><Icon name="truck" /> {despachando === o.id ? 'Despachando…' : 'Ya le entregué la carga: despachar'}</button>
+      : <button className="btn hoy-accion" type="button" onClick={() => accion(o, 'enviar')} data-testid={`hoy-enviar-${o.id}`}><Icon name="truck" /> {textoSiguientePaso(ent ? metodoSugerido(ent) : null)}</button>
+  }
+  const cuerpo = (o: Caso) => {
+    const dir = orderAddress(o.shipping_meta, null)
+    const ent = entregaDe(o); const envio = envioDe[o.id]; const paso = pasoDe(o)
+    const recoge = ent?.tipo === 'recoge' || ent?.tipo === 'mostrador'
+    return (
+      <div className="hoy-detalle-cuerpo" data-testid={`hoy-detalle-${o.id}`}>
+        <div className="hoy-detalle-cab">
+          <div className="hoy-detalle-nombre">{nombreDe(o)}</div>
+          <div className="hoy-detalle-sub"><span className="mono">{o.external_ref}</span><span className={'pill ' + paso.pill}>{o.__accion.tipo === 'despacho' ? `Con ${driverName(envio?.driver_id ?? null)} · falta darle salida` : paso.texto}</span></div>
+        </div>
+        <EntregaPill e={ent} />
+        <div>
+          <h4>Productos a empacar</h4>
+          {o.items.map((it) => <div key={it.id} className="hoy-detalle-prod"><b>{cantidadVista(byId[it.product_id ?? ''], it.qty)}</b> × {byId[it.product_id ?? '']?.name ?? 'Producto'}{/* CAJAS-MEDIOS */}</div>)}
+        </div>
+        <div>
+          <h4>{recoge ? 'Entrega' : 'Dirección'}</h4>
+          <div className="hoy-detalle-dir">{recoge ? ent?.texto : dir ? formatAddress(dir) : <span style={{ color: 'var(--warn)' }}>Sin dirección en el pedido</span>}{dir?.refs ? `\nRef.: ${dir.refs}` : ''}{dir?.phone ? `\nTel: ${dir.phone}` : ''}</div>
+        </div>
+        {errDespacho[o.id] && <div role="alert" style={{ fontSize: 12.5, color: 'var(--danger)' }}>{errDespacho[o.id]}</div>}
+      </div>
+    )
+  }
+  const filaRecoger = (o: OrderWithItems) => <FilaRecoger o={o} nombreProducto={(id) => byId[id]?.name ?? 'Producto'} producto={(id) => byId[id]} />
+  const renglon = (clave: string, o: OrderWithItems, paso: { texto: string; pill: string }) => (
+    <button key={clave} type="button" className={'taskrow hoy-renglon' + (elegido === clave ? ' hoy-renglon--sel' : '')} aria-pressed={elegido === clave} onClick={() => setSel(clave)} data-testid={`hoy-caso-${o.id}`}>
+      <span className="taskrow-tx">
+        <span className="taskrow-t">{nombreDe(o)}</span>
+        <span className="taskrow-d"><span className="mono">{o.external_ref}</span> · {o.items.length} producto{o.items.length === 1 ? '' : 's'} · {lugarDe(o)}</span>
+        {debioSalir(o) && <span className="taskrow-d hoy-renglon-atraso">{debioSalir(o)}</span>}
+      </span>
+      <span className={'pill ' + paso.pill} data-testid="hoy-paso">{paso.texto}</span>
+    </button>
   )
   return (
     <div className="grid" style={{ gap: 16 }}>
@@ -102,57 +172,49 @@ export function HoyAlmacen() {
         <div className="eyebrow" style={{ margin: 0 }}>La fila de hoy <span style={{ fontWeight: 400, color: 'var(--ink-3)' }}>({total} {total === 1 ? 'pedido' : 'pedidos'}, por hora de salida)</span></div>
         <div className="hoy-filtros" role="group" aria-label="Ver solo una parte de la fila">
           {chip('todos', 'Todos', total)}
+          {nAtrasados > 0 && chip('atrasados', 'Atrasados', nAtrasados)}
           {chip('preparar', 'Por preparar', nPreparar)}
           {chip('salir', 'Por salir', nSalir)}
           {chip('recoger', 'Para recoger', recoger.length)}
         </div>
       </div>
-      {grupos.length === 0 && !verRecoger ? (
+      {/* UN solo aviso de atraso, en vez de pintar de rojo cada grupo. En el celular basta el filtro «Atrasados N». */}
+      {ancho && nAtrasados > 0 && filtro !== 'atrasados' && (
+        <div className="hoy-atraso" role="status" data-testid="hoy-atraso">
+          <Icon name="clock" />
+          <span><b>{nAtrasados} {nAtrasados === 1 ? 'pedido ya pasó' : 'pedidos ya pasaron'} su fecha de salida.</b> Si ya {nAtrasados === 1 ? 'salió' : 'salieron'}, falta registrarlo.</span>
+          <button type="button" className="btn ghost sm" onClick={() => setFiltro('atrasados')} data-testid="hoy-atraso-ver">Ver solo esos</button>
+        </div>
+      )}
+      {claves.length === 0 ? (
         <Vacio icono="check" titulo={filtro === 'todos' ? 'Nada pendiente por ahora.' : 'Nada en esta parte de la fila.'} pista={filtro === 'todos' ? 'Los pedidos pagados aparecen aquí para prepararlos y enviarlos.' : 'Toca «Todos» para ver la fila completa.'} />
-      ) : grupos.map((g) => (
-        <React.Fragment key={g.titulo + g.items[0].id}>
-          <div className={'hoy-grupo hoy-grupo--' + g.cuando} data-testid="hoy-grupo"><Icon name="clock" /> {g.titulo} <span>({g.items.length})</span></div>
-          {g.items.map((o) => {
-          const meta = (o.shipping_meta ?? {}) as { customer?: { name?: string } | null }
-          const dir = orderAddress(o.shipping_meta, null)
-          const ent = entregaDe(o)
-          const envio = envioDe[o.id]
-          return (
-            <div key={o.id} className="card" data-testid={`hoy-caso-${o.id}`} style={{ borderLeft: '4px solid ' + (o.__accion.tipo === 'preparar' ? 'var(--warn)' : 'var(--green-deep)') }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
-                <span className="mono" style={{ fontSize: 14 }}>{o.external_ref}</span>
-                <b style={{ fontSize: 14 }}>{meta.customer?.name ?? 'Cliente'}</b>
-                <span className={'pill ' + (o.__accion.tipo === 'preparar' ? 'p-warn' : o.__accion.tipo === 'despacho' ? 'p-blue' : 'p-ok')} data-testid="hoy-paso">{o.__accion.tipo === 'preparar' ? 'Por preparar' : o.__accion.tipo === 'despacho' ? `Con ${driverName(envio?.driver_id ?? null)} · falta darle salida` : 'Preparado · por salir'}</span>
-              </div>
-              <EntregaPill e={ent} sinSalida />
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>Productos a empacar</div>
-                  {o.items.map((it) => <div key={it.id} style={{ fontSize: 13 }}><b>{cantidadVista(byId[it.product_id ?? ''], it.qty)}</b> × {byId[it.product_id ?? '']?.name ?? 'Producto'}{/* CAJAS-MEDIOS */}</div>)}
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>{ent?.tipo === 'recoge' || ent?.tipo === 'mostrador' ? 'Entrega' : 'Dirección'}</div>
-                  <div style={{ fontSize: 13, whiteSpace: 'pre-line' }}>{ent?.tipo === 'recoge' || ent?.tipo === 'mostrador' ? ent.texto : dir ? formatAddress(dir) : <span style={{ color: 'var(--warn)' }}>Sin dirección en el pedido</span>}{dir?.refs ? `\nRef.: ${dir.refs}` : ''}{dir?.phone ? `\nTel: ${dir.phone}` : ''}</div>
-                </div>
-              </div>
-              {errDespacho[o.id] && <div role="alert" style={{ fontSize: 12.5, color: 'var(--danger)', marginTop: 8 }}>{errDespacho[o.id]}</div>}
-              <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
-                {o.__accion.tipo === 'preparar'
-                  ? <button className="btn" type="button" onClick={() => setPreparar(o)} data-testid={`hoy-preparar-${o.id}`}><Icon name="layers" /> Preparar pedido</button>
-                  : o.__accion.tipo === 'despacho' && envio
-                  ? <button className="btn" type="button" disabled={despachando === o.id} onClick={() => void despachar(o, envio)} data-testid={`hoy-despachar-${o.id}`}><Icon name="truck" /> {despachando === o.id ? 'Despachando…' : 'Ya le entregué la carga: despachar'}</button>
-                  : <button className="btn" type="button" onClick={() => setEnviar(o)} data-testid={`hoy-enviar-${o.id}`}><Icon name="truck" /> {textoSiguientePaso(ent ? metodoSugerido(ent) : null)}</button>}
-              </div>
-            </div>
-          )
-          })}
-        </React.Fragment>
-      ))}
-      {verRecoger && (
-        <>
-          <div className="hoy-grupo" data-testid="hoy-grupo-recoger"><Icon name="box" /> Esperan a que el cliente los recoja <span>({recoger.length})</span></div>
-          {recoger.map((o) => <FilaRecoger key={o.id} o={o} nombreProducto={(id) => byId[id]?.name ?? 'Producto'} producto={(id) => byId[id]} />)}
-        </>
+      ) : (
+        <div className={'hoy-md' + (ancho ? '' : ' hoy-md--solo')}>
+          <div className="tasklist hoy-lista" data-testid="hoy-lista">
+            {grupos.map((g) => (
+              <React.Fragment key={g.titulo + g.items[0].id}>
+                <div className="hoy-grupo" data-testid="hoy-grupo"><Icon name="clock" /> {g.titulo} <span>({g.items.length})</span></div>
+                {g.items.map((o) => renglon(o.id, o, pasoDe(o)))}
+              </React.Fragment>
+            ))}
+            {verRecoger && (
+              <>
+                <div className="hoy-grupo" data-testid="hoy-grupo-recoger"><Icon name="box" /> Esperan a que el cliente los recoja <span>({recoger.length})</span></div>
+                {recoger.map((o) => renglon('r:' + o.id, o, { texto: 'Listo para recoger', pill: 'p-ok' }))}
+              </>
+            )}
+          </div>
+          {ancho && (
+            <aside className="card hoy-detalle" data-testid="hoy-detalle" aria-label="Pedido elegido">
+              {pedido ? <>{cuerpo(pedido)}<div className="hoy-detalle-accion">{boton(pedido)}</div></> : porRecoger ? filaRecoger(porRecoger) : null}
+            </aside>
+          )}
+        </div>
+      )}
+      {!ancho && (
+        <Hoja abierta={!!(pedido || porRecoger)} onCerrar={() => setSel(null)} titulo={pedido ? `Pedido ${pedido.external_ref ?? ''}` : 'Para recoger'} pie={pedido ? boton(pedido) : undefined} testid="hoy-hoja">
+          {pedido ? cuerpo(pedido) : porRecoger ? filaRecoger(porRecoger) : null}
+        </Hoja>
       )}
 
       <div className="eyebrow" style={{ margin: '6px 0 0' }}>El día en números</div>

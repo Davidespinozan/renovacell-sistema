@@ -5,7 +5,8 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 
-const h = vi.hoisted(() => ({ orders: [] as unknown[], envios: [] as unknown[], dispatch: vi.fn(), shipped: vi.fn() }))
+const h = vi.hoisted(() => ({ orders: [] as unknown[], envios: [] as unknown[], dispatch: vi.fn(), shipped: vi.fn(), ancho: true }))
+vi.mock('../../app/useAnchoMinimo', () => ({ useAnchoMinimo: () => h.ancho }))
 vi.mock('../../auth/RoleContext', () => ({ useRole: () => ({ role: 'warehouse', setScreen: vi.fn(), user: { name: 'Alberto', email: 'a@x' } }), useRoleOpcional: () => ({ role: 'warehouse', user: { name: 'Alberto' } }) }))
 vi.mock('../../data/hooks/useOrders', () => ({ useAllOrders: () => ({ data: h.orders }) }))
 vi.mock('../../data/hooks/useMoney', () => ({ useOrderMoney: () => ({ byOrder: {} }) }))
@@ -23,9 +24,9 @@ const DHL = { opcion: 'foraneo', tipo: 'foraneo', paqueteria: 'dhl', texto: 'DHL
 const LOCAL = { opcion: 'local', tipo: 'local', paqueteria: 'chofer', texto: 'Entrega local', flete: 0, salida: HOY, llega_desde: HOY, llega_hasta: HOY, horario: { fecha: HOY, inicio: '16:00', fin: '18:00' } }
 
 beforeEach(() => {
-  cleanup(); h.dispatch.mockReset(); h.shipped.mockReset()
+  cleanup(); h.dispatch.mockReset(); h.shipped.mockReset(); h.ancho = true
   h.orders = [
-    { ...base('o1', 'S1', 'Dra. Morales'), status: 'paid', shipping_meta: meta('Dra. Morales', DHL) },
+    { ...base('o1', 'S1', 'ROCIO UGALDE PEDROZA'), status: 'paid', shipping_meta: meta('ROCIO UGALDE PEDROZA', DHL) },
     { ...base('o2', 'S2', 'Dr. Ruiz'), status: 'packed', shipping_meta: meta('Dr. Ruiz', LOCAL) },
     { ...base('o3', 'S3', 'Dr. Vega'), status: 'packed', shipping_meta: meta('Dr. Vega', LOCAL) },
     { ...base('o4', 'S4', 'Dra. Luna'), status: 'shipped', shipping_meta: meta('Dra. Luna', null, { method: 'recoge' }) },
@@ -33,22 +34,40 @@ beforeEach(() => {
   h.envios = [{ id: 'e3', order_id: 'o3', driver_id: 'drv-1', status: 'por_despachar', created_at: `${HOY}T11:00:00Z`, carrier: null, tracking_number: null }]
 })
 
-describe('<HoyAlmacen> · la fila del día', () => {
-  it('agrupa por cuándo sale y con quién, y cada pedido trae el botón de su paso', () => {
+describe('<HoyAlmacen> · lista y detalle (computadora)', () => {
+  it('los pedidos van en renglones cortos, agrupados por cuándo salen y con quién', () => {
     render(<HoyAlmacen />)
     expect(screen.getAllByTestId('hoy-grupo').map((g) => g.textContent)).toEqual([' Sale hoy antes de las 3:30 p.m. · DHL (1)', ' Sale hoy antes de las 4:00 p.m. · chofer (2)'])
-    expect(screen.getByTestId('hoy-preparar-o1')).toHaveTextContent('Preparar pedido')
-    expect(screen.getByTestId('hoy-enviar-o2')).toHaveTextContent('Entregar al chofer')
-    expect(screen.getByTestId('hoy-despachar-o3')).toHaveTextContent('Ya le entregué la carga: despachar')
-    expect(within(screen.getByTestId('hoy-caso-o3')).getByTestId('hoy-paso')).toHaveTextContent(/falta darle salida/)
-    // el encabezado del grupo ya dice cuándo sale: la tarjeta no lo repite, pero conserva con quién va y la promesa
-    expect(within(screen.getByTestId('hoy-caso-o1')).queryByTestId('pedido-salida')).toBeNull()
-    expect(within(screen.getByTestId('hoy-caso-o1')).getByTestId('cola-entrega')).toHaveTextContent('DHL')
+    const fila = screen.getByTestId('hoy-caso-o1')
+    expect(fila).toHaveTextContent('Rocio Ugalde Pedroza')          // el nombre ya no sale en MAYÚSCULAS
+    expect(fila).toHaveTextContent('S1 · 1 producto · Culiacán')
+    expect(within(fila).getByTestId('hoy-paso')).toHaveTextContent('Por preparar')
+    expect(within(screen.getByTestId('hoy-caso-o3')).getByTestId('hoy-paso')).toHaveTextContent('Falta darle salida')
   })
 
-  it('lo que espera a que el cliente lo recoja está en Inicio, con el nombre para tocarlo', () => {
+  it('el primero ya viene abierto al lado, con sus productos, su dirección y UN botón', () => {
+    render(<HoyAlmacen />)
+    const d = screen.getByTestId('hoy-detalle')
+    expect(within(d).getByTestId('hoy-detalle-o1')).toHaveTextContent('Productos a empacar')
+    expect(d).toHaveTextContent('Av. Obregón 1')
+    expect(within(d).getByTestId('hoy-preparar-o1')).toHaveTextContent('Preparar pedido')
+    expect(screen.getAllByRole('button', { name: /Preparar pedido/ })).toHaveLength(1)   // ya no se repite en cada pedido
+  })
+
+  it('al tocar otro renglón se abre ese pedido con el botón de su paso', () => {
+    render(<HoyAlmacen />)
+    fireEvent.click(screen.getByTestId('hoy-caso-o2'))
+    expect(screen.getByTestId('hoy-enviar-o2')).toHaveTextContent('Entregar al chofer')
+    expect(screen.getByTestId('hoy-caso-o2').getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByTestId('hoy-caso-o3'))
+    expect(screen.getByTestId('hoy-despachar-o3')).toHaveTextContent('Ya le entregué la carga: despachar')
+    expect(screen.getByTestId('hoy-detalle-o3')).toHaveTextContent(/falta darle salida/)
+  })
+
+  it('lo que espera a que el cliente lo recoja está en la lista, con el nombre para tocarlo', () => {
     render(<HoyAlmacen />)
     expect(screen.getByTestId('hoy-grupo-recoger')).toHaveTextContent('Esperan a que el cliente los recoja (1)')
+    fireEvent.click(screen.getByTestId('hoy-caso-o4'))
     fireEvent.click(screen.getByTestId('recoger-entregar'))
     fireEvent.click(screen.getByTestId('recoger-sugerido'))
     expect((screen.getByTestId('recoger-quien') as HTMLInputElement).value).toBe('Dra. Luna')
@@ -63,15 +82,17 @@ describe('<HoyAlmacen> · la fila del día', () => {
     fireEvent.click(screen.getByTestId('hoy-filtro-salir'))
     expect(screen.queryByTestId('hoy-caso-o1')).toBeNull()
     expect(screen.getByTestId('hoy-caso-o2')).toBeTruthy()
+    expect(screen.getByTestId('hoy-enviar-o2')).toBeTruthy()      // el detalle sigue al filtro: abre el primero que quedó
     expect(screen.queryByTestId('hoy-grupo-recoger')).toBeNull()
     fireEvent.click(screen.getByTestId('hoy-filtro-recoger'))
     expect(screen.queryByTestId('hoy-caso-o2')).toBeNull()
     expect(screen.getByTestId('hoy-grupo-recoger')).toBeTruthy()
   })
 
-  it('dar salida desde Inicio despacha el envío y luego pone el pedido En camino', async () => {
+  it('dar salida desde el detalle despacha el envío y luego pone el pedido En camino', async () => {
     h.dispatch.mockResolvedValue({ ok: true }); h.shipped.mockResolvedValue({ ok: true })
     render(<HoyAlmacen />)
+    fireEvent.click(screen.getByTestId('hoy-caso-o3'))
     fireEvent.click(screen.getByTestId('hoy-despachar-o3'))
     await waitFor(() => expect(h.shipped).toHaveBeenCalledWith('o3', expect.objectContaining({ method: 'chofer', driver_id: 'drv-1' })))
     expect(h.dispatch).toHaveBeenCalledWith('e3', 'Alberto', 'S3')
@@ -80,13 +101,57 @@ describe('<HoyAlmacen> · la fila del día', () => {
   it('si la salida no quedó, lo dice en ese pedido y no lo pone En camino', async () => {
     h.dispatch.mockResolvedValue({ ok: false, error: 'Sin conexión.', ambiguous: false })
     render(<HoyAlmacen />)
+    fireEvent.click(screen.getByTestId('hoy-caso-o3'))
     fireEvent.click(screen.getByTestId('hoy-despachar-o3'))
-    await waitFor(() => expect(within(screen.getByTestId('hoy-caso-o3')).getByRole('alert')).toHaveTextContent('NO se despachó. Sin conexión.'))
+    await waitFor(() => expect(within(screen.getByTestId('hoy-detalle-o3')).getByRole('alert')).toHaveTextContent('NO se despachó. Sin conexión.'))
     expect(h.shipped).not.toHaveBeenCalled()
+  })
+
+  it('un solo aviso dice cuántos van atrasados, y se pueden ver solo esos', () => {
+    const antier = new Date(new Date(HOY + 'T12:00:00Z').getTime() - 2 * 86_400_000).toISOString().slice(0, 10)
+    h.orders = [...h.orders, { ...base('o9', 'S9', 'Dr. Peña'), status: 'paid', shipping_meta: meta('Dr. Peña', { ...DHL, salida: antier, llega_desde: antier, llega_hasta: antier }) }]
+    render(<HoyAlmacen />)
+    expect(screen.getByTestId('hoy-atraso')).toHaveTextContent('1 pedido ya pasó su fecha de salida.')
+    expect(screen.getByTestId('hoy-filtro-atrasados')).toHaveTextContent('Atrasados 1')
+    // los atrasados van en un solo grupo y cada renglón dice cuándo debió salir y con quién
+    expect(screen.getAllByTestId('hoy-grupo')[0]).toHaveTextContent('Ya pasó su fecha de salida (1)')
+    expect(screen.getByTestId('hoy-caso-o9')).toHaveTextContent(/Debió salir el \d\d\/\d\d · DHL/)
+    fireEvent.click(screen.getByTestId('hoy-atraso-ver'))
+    expect(screen.getByTestId('hoy-caso-o9')).toBeTruthy()
+    expect(screen.queryByTestId('hoy-caso-o1')).toBeNull()
+    expect(screen.queryByTestId('hoy-atraso')).toBeNull()
+  })
+
+  it('sin atrasados no hay aviso ni filtro de atrasados', () => {
+    render(<HoyAlmacen />)
+    expect(screen.queryByTestId('hoy-atraso')).toBeNull()
+    expect(screen.queryByTestId('hoy-filtro-atrasados')).toBeNull()
   })
 
   it('los números del día siguen ahí, debajo de la fila', () => {
     render(<HoyAlmacen />)
     for (const t of ['hoy-decision', 'hoy-guias', 'hoy-camino']) expect(screen.getByTestId(t)).toBeTruthy()
+  })
+})
+
+describe('<HoyAlmacen> · en el celular', () => {
+  it('solo se ve la lista; al tocar un pedido se abre en una hoja con su botón', () => {
+    h.ancho = false
+    render(<HoyAlmacen />)
+    expect(screen.queryByTestId('hoy-detalle')).toBeNull()
+    expect(screen.queryByTestId('hoy-hoja')).toBeNull()
+    expect(screen.queryByTestId('hoy-atraso')).toBeNull()
+    fireEvent.click(screen.getByTestId('hoy-caso-o2'))
+    const hoja = screen.getByTestId('hoy-hoja')
+    expect(within(hoja).getByTestId('hoy-detalle-o2')).toHaveTextContent('Productos a empacar')
+    expect(within(hoja).getByTestId('hoy-enviar-o2')).toHaveTextContent('Entregar al chofer')
+  })
+  it('al tocar el botón la hoja se cierra y se abre la ventana de ese paso (no se enciman)', () => {
+    h.ancho = false
+    render(<HoyAlmacen />)
+    fireEvent.click(screen.getByTestId('hoy-caso-o2'))
+    fireEvent.click(screen.getByTestId('hoy-enviar-o2'))
+    expect(screen.queryByTestId('hoy-hoja')).toBeNull()
+    expect(screen.getByRole('heading', { name: /Entregar al chofer · S2/ })).toBeTruthy()
   })
 })

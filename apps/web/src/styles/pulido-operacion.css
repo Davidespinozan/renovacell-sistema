@@ -93,10 +93,40 @@
 .hoy-fila-cab{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px}
 .hoy-filtros{display:flex;flex-wrap:wrap;gap:8px}
 .hoy-filtros .fchip{min-height:40px;display:inline-flex;align-items:center;gap:6px}
-.hoy-grupo{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13.5px;font-weight:700;color:var(--ink)}
-.hoy-grupo svg{width:16px;height:16px;flex:none;color:var(--ink-3)}
-.hoy-grupo span{font-weight:500;color:var(--ink-3)}
-.hoy-grupo--atrasado,.hoy-grupo--atrasado svg{color:var(--danger)}
+/* LISTA + DETALLE (27 nov 2026) · renglones cortos en UNA tarjeta; el pedido elegido se abre al lado (o en una hoja). */
+.rh.rh--almacen{max-width:1360px}
+.hoy-md{display:grid;grid-template-columns:minmax(340px,5fr) minmax(0,6fr);gap:16px;align-items:start}
+.hoy-md--solo{grid-template-columns:minmax(0,1fr)}
+.hoy-lista{box-shadow:var(--ds-shadow)}
+.hoy-grupo{display:flex;align-items:center;gap:8px;padding:10px 14px 8px;border-top:1px solid var(--line);background:var(--ds-subtle);font-size:12.5px;font-weight:600;color:var(--ds-text-2)}
+.hoy-lista > .hoy-grupo:first-child{border-top:0}
+.hoy-grupo svg{width:15px;height:15px;flex:none;color:var(--ds-muted)}
+.hoy-grupo span{font-weight:500;color:var(--ds-muted)}
+.hoy-renglon{min-height:60px;cursor:pointer}
+.hoy-renglon .taskrow-d .mono{font-size:12.5px}
+.hoy-renglon--sel,button.hoy-renglon--sel:hover{background:var(--ds-brand-soft)}
+.hoy-detalle{position:sticky;top:88px;display:grid;gap:16px;padding:22px;max-height:calc(100vh - 108px);overflow:auto;box-shadow:var(--ds-shadow)}
+.hoy-detalle-cuerpo{display:grid;gap:16px;min-width:0}
+.hoy-detalle-cab{display:grid;gap:6px}
+.hoy-detalle-nombre{font-size:var(--ds-fs-xl);font-weight:600;line-height:1.25;color:var(--ink)}
+.hoy-detalle-sub{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px;color:var(--ds-text-2)}
+.hoy-detalle-cuerpo h4{margin:0 0 4px;font-size:12px;font-weight:600;color:var(--ds-muted)}
+.hoy-detalle-cuerpo [data-testid="cola-entrega"]{margin:0}
+.hoy-detalle-prod{font-size:14px;line-height:1.5}
+.hoy-detalle-dir{font-size:14px;line-height:1.5;white-space:pre-line}
+.hoy-detalle-accion{display:flex;justify-content:flex-end;padding-top:14px;border-top:1px solid var(--line)}
+.hoy-accion{min-height:48px;justify-content:center}
+.ds-hoja-pie .hoy-accion{flex:1}
+.hoy-renglon-atraso{color:var(--ds-warning);font-weight:500}
+.hoy-filtros .fchip--aviso:not(.on) b{color:var(--ds-warning)}
+@media (max-width:640px){
+  .hoy-filtros{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px}
+  .hoy-filtros::-webkit-scrollbar{display:none}
+  .hoy-filtros .fchip{flex:none}
+}
+.hoy-atraso{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 14px;border-radius:var(--ds-r);background:var(--ds-warning-bg);color:var(--ds-warning);font-size:13.5px}
+.hoy-atraso svg{width:16px;height:16px;flex:none}
+.hoy-atraso span{flex:1 1 220px;min-width:0;color:var(--ink)}
 
 /* RECIBIR LA COMPRA COMPLETA (27 nov 2026) · un renglón por producto: lote, caducidad y lo que llegó. */
 .modal.rc-modal{max-width:860px}
