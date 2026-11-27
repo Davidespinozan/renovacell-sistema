@@ -68,8 +68,8 @@ function useTareasBase(): Task[] {
     const porEmpacar = orders.filter((o) => o.status === 'packed')
 
     if (role === 'warehouse' || role === 'packing') {   // AUXILIAR · mismo trabajo de salida; recibir e inspeccionar son de Almacén
-      if (porSurtir.length) t.push({ id: 'surtir', icon: 'layers', title: 'Pedidos por surtir', detail: 'Asigna lotes por FEFO y descuenta inventario.', count: porSurtir.length, tone: 'warn', screen: 'surtido' })
-      if (porEmpacar.length) t.push({ id: 'empacar', icon: 'pkg', title: 'Pedidos por empacar', detail: 'Asigna envío (paquetería o chofer).', count: porEmpacar.length, tone: 'warn', screen: 'cola' })
+      if (porSurtir.length) t.push({ id: 'surtir', icon: 'layers', title: 'Pedidos por preparar', detail: 'Toma cada producto del lote que caduca primero; se descuenta del inventario.', count: porSurtir.length, tone: 'warn', screen: 'surtido' })
+      if (porEmpacar.length) t.push({ id: 'empacar', icon: 'pkg', title: 'Preparados por enviar', detail: 'Genera la guía, entrégalo al chofer o déjalo listo para recoger.', count: porEmpacar.length, tone: 'warn', screen: 'cola' })
       // Carga ya asignada a un chofer que sigue en el almacén.
       const porDespachar = shipments.filter((sh) => sh.status === 'por_despachar')
       if (porDespachar.length) t.push({ id: 'despachar', icon: 'truck', title: 'Carga por despachar', detail: 'Entrégala al chofer para que salga a ruta.', count: porDespachar.length, tone: 'warn', screen: 'despacho' })

@@ -10,8 +10,8 @@ const base: OrderMoney = {
 const con = (p: Partial<OrderMoney>): OrderMoney => ({ ...base, ...p })
 
 describe('etiquetaPago — proyección financiera', () => {
-  it('sin cobro ⇒ "Sin pago"', () => {
-    expect(etiquetaPago(base)).toMatchObject({ texto: 'Sin pago', tono: 'bad' })
+  it('sin cobro ⇒ "Por cobrar"', () => {
+    expect(etiquetaPago(base)).toMatchObject({ texto: 'Por cobrar', tono: 'bad' })
   })
   it('cobro suficiente ⇒ "Pagado"', () => {
     expect(etiquetaPago(con({ estado_pago: 'paid', cobrado: 1000, cobrado_neto: 1000, saldo: 0 }))).toMatchObject({ texto: 'Pagado', tono: 'ok' })
@@ -32,25 +32,25 @@ describe('etiquetaPago — proyección financiera', () => {
 describe('etiquetaLiberacion — crédito NO es pago (objetivo 4)', () => {
   const credito = con({ credito_autorizado: true, due_date: '2026-10-30', liberado: true })
   it('crédito autorizado libera para surtir', () => {
-    expect(etiquetaLiberacion(credito).texto).toBe('Crédito autorizado')
+    expect(etiquetaLiberacion(credito).texto).toBe('A crédito')
   })
   it('crédito autorizado NUNCA se muestra como pagado', () => {
     const e = etiquetaLiberacion(credito)
     expect(e.texto.toLowerCase()).not.toContain('pagad')
-    expect(etiquetaPago(credito).texto).toBe('Sin pago')
+    expect(etiquetaPago(credito).texto).toBe('Por cobrar')
   })
   it('la etiqueta de crédito muestra lo que se sigue debiendo', () => {
     expect(etiquetaLiberacion(credito).detalle).toContain('1000')
   })
   it('crédito vencido se marca en rojo', () => {
-    expect(etiquetaLiberacion({ ...credito, vencido: true })).toMatchObject({ texto: 'Crédito VENCIDO', tono: 'bad' })
+    expect(etiquetaLiberacion({ ...credito, vencido: true })).toMatchObject({ texto: 'Crédito vencido', tono: 'bad' })
   })
   it('pagado sin crédito ⇒ liberado por cobro', () => {
-    expect(etiquetaLiberacion(con({ estado_pago: 'paid', saldo: 0, liberado: true })).texto).toBe('Liberado por cobro')
+    expect(etiquetaLiberacion(con({ estado_pago: 'paid', saldo: 0, liberado: true })).texto).toBe('Ya pasa a Almacén')
   })
   it('sin cobro ni crédito ⇒ no liberado, con qué hacer', () => {
     const e = etiquetaLiberacion(base)
-    expect(e.texto).toBe('No liberado')
+    expect(e.texto).toBe('Todavía no pasa a Almacén')
     expect(e.detalle).toMatch(/cobro|crédito/i)
   })
 })
@@ -79,7 +79,7 @@ describe('crédito saldado — se dio a crédito y después se cobró completo (
     expect(creditoVencido(saldado)).toBe(false)
   })
   it('se presenta como liberado por cobro, no como crédito vencido', () => {
-    expect(etiquetaLiberacion(saldado)).toMatchObject({ texto: 'Liberado por cobro', tono: 'ok' })
+    expect(etiquetaLiberacion(saldado)).toMatchObject({ texto: 'Ya pasa a Almacén', tono: 'ok' })
     expect(etiquetaPago(saldado).texto).toBe('Pagado')
   })
   it('sin días de atraso en la cobranza', () => {
@@ -89,7 +89,7 @@ describe('crédito saldado — se dio a crédito y después se cobró completo (
     const parcial = { ...saldado, estado_pago: 'parcial' as const, cobrado: 400, cobrado_neto: 400, saldo: 600 }
     expect(creditoAbierto(parcial)).toBe(true)
     expect(creditoVencido(parcial)).toBe(true)
-    expect(etiquetaLiberacion(parcial).texto).toBe('Crédito VENCIDO')
+    expect(etiquetaLiberacion(parcial).texto).toBe('Crédito vencido')
   })
 })
 

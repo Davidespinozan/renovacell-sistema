@@ -128,7 +128,7 @@ export function Tablero() {
           <small>{cxc.data ? `${cxc.data.pedidos} ${cxc.data.pedidos === 1 ? 'pedido' : 'pedidos'} con saldo` : 'saldo a hoy'}</small>
         </div>
         <div className={'tb-cifra' + (porSurtir.length ? ' tb-cifra--warn' : '')}>
-          <span>Por surtir</span>
+          <span>Por preparar</span>
           <b>{porSurtir.length}</b>
           <small>{atorados.length ? `${atorados.length} envíos atorados` : 'pedidos esperando almacén'}</small>
         </div>
@@ -148,7 +148,7 @@ export function Tablero() {
                 { indicador: 'Ventas · histórico', valor: kTodo.data?.ventas ?? 'No disponible' },
                 { indicador: 'Ticket promedio · histórico', valor: kTodo.data?.ticket ?? 'No disponible' },
                 { indicador: 'Doctores con compra · histórico', valor: act.active },
-                { indicador: 'Por surtir', valor: porSurtir.length },
+                { indicador: 'Por preparar', valor: porSurtir.length },
                 { indicador: 'Envíos atorados', valor: atorados.length },
                 { indicador: 'Lotes por caducar', valor: porCaducar.length },
                 { indicador: riesgo.completo ? 'Valor en riesgo por caducidad' : 'Valor en riesgo por caducidad (mínimo: hay lotes sin costo)', valor: riesgo.valor },
@@ -201,9 +201,9 @@ export function Tablero() {
           ))}
         </AlertCard>
 
-        <AlertCard title="Pendientes de surtir" icon="layers" tone="warn" empty="Todo surtido.">
+        <AlertCard title="Por preparar" icon="layers" tone="warn" empty="Nada por preparar.">
           {porSurtir.map((o) => (
-            <AlertItem key={o.id} folio={o.external_ref} text={`${o.items.length} renglón(es)`} pill="p-warn" badge={money(o.total)} />
+            <AlertItem key={o.id} folio={o.external_ref} text={`${o.items.length} ${o.items.length === 1 ? 'producto' : 'productos'}`} pill="p-warn" badge={money(o.total)} />
           ))}
         </AlertCard>
       </div>

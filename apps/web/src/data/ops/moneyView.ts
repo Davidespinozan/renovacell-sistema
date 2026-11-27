@@ -23,7 +23,7 @@ export function etiquetaPago(m: Pick<OrderMoney, 'estado_pago' | 'saldo' | 'cobr
     case 'paid': return { texto: 'Pagado', tono: 'ok' }
     case 'refunded': return { texto: 'Reembolsado', tono: 'muted' }
     case 'parcial': return { texto: 'Pago parcial', tono: 'warn', detalle: `Falta ${m.saldo}` }
-    default: return { texto: 'Sin pago', tono: 'bad' }
+    default: return { texto: 'Por cobrar', tono: 'bad' }   // UN SOLO IDIOMA (27 nov 2026): antes «Sin pago»
   }
 }
 
@@ -37,14 +37,15 @@ export const creditoVencido = (m: Pick<OrderMoney, 'credito_autorizado' | 'saldo
 
 // Por qué (o por qué no) se puede surtir. NUNCA dice "pagado" por un crédito.
 export function etiquetaLiberacion(m: Pick<OrderMoney, 'liberado' | 'credito_autorizado' | 'due_date' | 'vencido' | 'estado_pago' | 'saldo'>): EtiquetaPago {
-  if (!m.liberado) return { texto: 'No liberado', tono: 'bad', detalle: 'Registra el cobro o pide crédito a Dirección' }
-  if (m.estado_pago === 'paid' || !creditoAbierto(m)) return { texto: 'Liberado por cobro', tono: 'ok' }
+  // UN SOLO IDIOMA (27 nov 2026): sin jerga. Antes «No liberado» / «Liberado por cobro» / «Crédito autorizado» / «Crédito VENCIDO».
+  if (!m.liberado) return { texto: 'Todavía no pasa a Almacén', tono: 'bad', detalle: 'Registra el cobro o pide crédito a Dirección' }
+  if (m.estado_pago === 'paid' || !creditoAbierto(m)) return { texto: 'Ya pasa a Almacén', tono: 'ok' }
   {
     return m.vencido
-      ? { texto: 'Crédito VENCIDO', tono: 'bad', detalle: `Venció el ${fecha(m.due_date)} · debe ${m.saldo}` }
-      : { texto: 'Crédito autorizado', tono: 'warn', detalle: `Vence ${fecha(m.due_date)} · debe ${m.saldo}` }
+      ? { texto: 'Crédito vencido', tono: 'bad', detalle: `Venció el ${fecha(m.due_date)} · debe ${m.saldo}` }
+      : { texto: 'A crédito', tono: 'warn', detalle: `Vence ${fecha(m.due_date)} · debe ${m.saldo}` }
   }
-  return { texto: 'Liberado por cobro', tono: 'ok' }
+  return { texto: 'Ya pasa a Almacén', tono: 'ok' }
 }
 
 // ¿Se le debe dinero al cliente y todavía no ha salido de la caja?

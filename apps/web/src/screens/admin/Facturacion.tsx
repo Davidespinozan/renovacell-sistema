@@ -35,6 +35,7 @@ import { cancelCfdi, refreshCancelStatus, type MotivoCancel } from '../../data/o
 import { usePaymentClaims, useOrderMoney } from '../../data/hooks/useMoney'
 import { useOpId } from '../../data/hooks/useOpId'
 import { METODOS, type OrderMoney, type PaymentClaim, type PaymentMethod } from '../../data/ops/money'
+import { capitalizarNombre } from '../../lib/nombres'
 import { creditoAbierto, etiquetaPago, etiquetaLiberacion } from '../../data/ops/moneyView'
 import { AMBIGUO_MSG } from '../../data/ops/w1Command'
 import { useBankAccounts } from '../../data/hooks/useBankAccounts'
@@ -55,11 +56,11 @@ const notCancelled = (o: OrderWithItems) => o.status !== 'cancelled'
 interface Tag { label: string; pill: string }
 const PILL: Record<string, string> = { ok: 'p-ok', warn: 'p-warn', bad: 'p-dang', muted: 'p-neu' }
 // Estado de COBRO desde el libro (v_order_money). Un crédito autorizado NO se etiqueta
-// como pagado: sale como "Crédito autorizado", que es lo que realmente es.
+// como pagado: sale como «A crédito», que es lo que realmente es.
 function cobroTag(o: OrderWithItems, m?: OrderMoney | null): Tag {
   if (!m) {
     if (o.payment_status === 'paid') return { label: 'Pagado', pill: 'p-ok' }
-    return { label: 'Pendiente', pill: 'p-neu' }
+    return { label: 'Por cobrar', pill: 'p-neu' }
   }
   if (m.estado_pago !== 'paid' && creditoAbierto(m)) {
     const e = etiquetaLiberacion(m)
@@ -157,12 +158,18 @@ export function Facturacion() {
       <div className="eyebrow crumb">Administración · Facturación</div>
 
       {/* KPIs */}
-      <div className="grid sigs">
-        <Stat icon={<FileText size={18} />} v={String(solicitados)} k="CFDI solicitados" s="por el cliente" />
-        <Stat icon={<Receipt size={18} />} v={String(porEmitir)} k="Por emitir" s="solicitados sin CFDI" />
-        <Stat icon={<FileCheck2 size={18} />} v={String(emitidos)} k="Emitidos" s="CFDI generados" />
-        <Stat icon={<BadgeDollarSign size={18} />} v={cifra(kTodo, (k) => money(k.cobrado_neto))} k="Cobrado" s="histórico · lo que entró menos lo que salió" />
-        <Stat icon={<Clock size={18} />} v={cifra(kCxc, (c) => money(c.total))} k="Por cobrar" s={kCxc.data ? `saldo a hoy · ${kCxc.data.pedidos} ${kCxc.data.pedidos === 1 ? 'pedido' : 'pedidos'}` : 'saldo a hoy'} />
+      {/* RESUMEN (27 nov 2026): lo que pide acción en grande —por emitir, emitidos, por cobrar— y lo demás en una línea,
+          igual que en Ventas. Antes eran cinco tarjetas que en el celular ocupaban la pantalla completa. Mismas cifras. */}
+      <div className="card vd-resumen" data-testid="fact-resumen">
+        <div className="vd-resumen-cifras">
+          <div><b className={'mono' + (porEmitir > 0 ? ' vd-warn' : '')} data-testid="fact-por-emitir">{porEmitir}</b><span>Por emitir · solicitados sin CFDI</span></div>
+          <div><b className="mono" data-testid="fact-emitidos">{emitidos}</b><span>Emitidos</span></div>
+          <div><b className="mono" data-testid="fact-por-cobrar">{cifra(kCxc, (c) => money(c.total))}</b><span>{kCxc.data ? `Por cobrar · saldo a hoy · ${kCxc.data.pedidos} ${kCxc.data.pedidos === 1 ? 'pedido' : 'pedidos'}` : 'Por cobrar · saldo a hoy'}</span></div>
+        </div>
+        <div className="vd-resumen-extra">
+          <span>CFDI solicitados por el cliente <b>{solicitados}</b></span>
+          <span>Cobrado histórico <b>{cifra(kTodo, (k) => money(k.cobrado_neto))}</b> (lo que entró menos lo que salió)</span>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -231,7 +238,7 @@ export function Facturacion() {
                   <tr key={o.id} className="clickrow" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click() } }} onClick={() => setSelected(o.id)}>
                     <td data-label="Folio" className="mono">{o.external_ref}</td>
                     <td data-label="Fecha" style={{ whiteSpace: 'nowrap' }}>{fmtDate(o.created_at)}</td>
-                    <td data-label="Cliente">{clientName(o)}{pos ? ' ' : ''}</td>
+                    <td data-label="Cliente">{capitalizarNombre(clientName(o)) || clientName(o)}{pos ? ' ' : ''}</td>
                     <td data-label="Monto" data-rol="valor" className="mono">{money(o.total)}</td>
                     <td data-label="Cobro"><span className={'pill ' + cob.pill}>{cob.label}</span></td>
                     <td data-label="CFDI"><span className={'pill ' + cf.pill}>{cf.label}</span></td>
@@ -258,7 +265,7 @@ export function Facturacion() {
                 const days = Math.max(0, diasEntre(diaNegocio(d.oldest), hoyNegocio()))
                 return (
                   <tr key={d.name}>
-                    <td data-label="Cliente">{d.name}</td>
+                    <td data-label="Cliente">{capitalizarNombre(d.name) || d.name}</td>
                     <td data-label="Pedidos" className="mono">{d.count}</td>
                     <td data-label="Adeudo" className="mono">{money(d.total)}</td>
                     <td data-label="Antigüedad"><span className={'pill ' + (days > 30 ? 'p-warn' : 'p-neu')}>{days} d</span></td>
@@ -274,17 +281,6 @@ export function Facturacion() {
       {selectedOrder && (
         <BillDetail order={selectedOrder} productsById={productsById} clientName={clientName(selectedOrder)} clientEmail={selectedOrder.doctor_id ? doctorsById[selectedOrder.doctor_id]?.email ?? '' : ''} dinero={byOrder[selectedOrder.id] ?? null} claim={claimByOrder[selectedOrder.id] ?? null} onClose={() => setSelected(null)} />
       )}
-    </div>
-  )
-}
-
-function Stat({ icon, v, k, s }: { icon: React.ReactNode; v: string; k: string; s: string }) {
-  return (
-    <div className="card sig">
-      <div className="chip">{icon}</div>
-      <div className="v" style={{ fontSize: 19 }}>{v}</div>
-      <div className="k">{k}</div>
-      <div className="s">{s}</div>
     </div>
   )
 }

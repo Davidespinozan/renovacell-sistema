@@ -4,6 +4,7 @@
 // CARTERA-P1 · Ventas alterna tres vistas SEPARADAS: "Todos" (lo que permite la RLS), "Mi cartera" (asignación
 // VIGENTE de cc_cartera, la que asigna Dirección) y "Cartera histórica (Odoo)" (registros heredados por
 // equivalencia EXPLÍCITA; no son asignaciones). Ambas carteras vienen del servidor por id, nunca por nombre.
+import { capitalizarNombre } from '../lib/nombres'
 import { Vacio, Cargando } from './EmptyState'
 import React, { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
@@ -161,7 +162,7 @@ function DirectorioDireccion({ title, scope, carteraToggle = false, clienteCarte
             <button key={c.id} type="button" className="op-fila" onClick={() => setDetail(c)}>
               <div className="avatar" style={{ background: avatarColor(c.full_name || '?') }}>{initials(c.full_name || '?')}</div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontWeight: 600 }}>{c.full_name}</div>
+                <div style={{ fontWeight: 600 }}>{capitalizarNombre(c.full_name) || c.full_name}</div>{/* los de Odoo vienen en MAYÚSCULAS: solo cambia cómo se ven */}
                 <div style={{ fontSize: 12.5, color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {[dash(c.city) !== '—' ? c.city : null, dash(c.seller_name) !== '—' ? `Odoo: ${c.seller_name}` : null].filter(Boolean).join(' · ') || '—'}
                 </div>
