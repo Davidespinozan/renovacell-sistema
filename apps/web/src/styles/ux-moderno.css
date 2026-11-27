@@ -37,13 +37,11 @@ body,.main{background:var(--ux-bg)}
   .top-logo img{width:30px;height:30px}
 }
 
-/* ── Barra de abajo (celular) clara, el activo en verde ─────────────────────────────────────────── */
+/* ── Barra de abajo (celular): VERDE OSCURO, igual que el menú lateral ─────────────────────────────
+   DUEÑO (26 nov 2026): «quedó blanco, no me gusta» — en los bocetos que aprobó la barra era verde oscuro. Esta capa la
+   aclaraba; ya no. La pintan shell.css (fondo) y mobile.css (activo en blanco con su ícono en verde). Aquí solo queda
+   el globo del conteo. */
 @media (max-width:900px){
-  .bnav{background:var(--ux-surface);background-image:none;border-top:1px solid var(--ux-line);box-shadow:none}
-  .bnav a{color:var(--ux-ink-3)}
-  .bnav a span{color:inherit}
-  .bnav a.on{color:var(--ux-accent);font-weight:600}
-  .bnav a.on svg{background:var(--ux-accent-soft);color:var(--ux-accent)}
   .bnav a .bnav-n{position:absolute;transform:translate(13px,-8px);min-width:17px;height:17px;padding:0 5px;border-radius:9px;background:var(--st-bad);color:var(--ds-on-ink);font:700 10.5px/17px var(--font-ui,inherit);text-align:center}
 }
 
