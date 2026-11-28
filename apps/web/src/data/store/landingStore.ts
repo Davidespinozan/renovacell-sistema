@@ -98,7 +98,7 @@ const DEFAULT: LandingContent = {
     text: 'Envío sin costo en pedidos mayores a $5,000 · Solo para médicos verificados',
     link: '', startsAt: '', endsAt: '',
   },
-  seo: { title: 'Renovacell® — Tecnologías Antiedad | Medical Grade desde 2008', description: 'Renovacell. Tecnología S2RM® para profesionales de la salud. Certificación CE, registro COFEPRIS. Desde 2008, México y la Unión Europea.' },
+  seo: { title: 'Renovacell® — Tecnologías Antiedad | Medical Grade desde 2008', description: 'Renovacell. Tecnología S2RM® para profesionales de la salud. Certificación CE. Desde 2008, México y la Unión Europea.' },
   topbar: { link: 'Más información' },
   brand: { name: 'RENOVACELL<sup>®</sup>', tagline: 'Tecnologías Antiedad', logoUrl: '' },
   nav: {
@@ -108,15 +108,15 @@ const DEFAULT: LandingContent = {
   hero: {
     eyebrow: 'Tecnología celular S²RM® · Grado europeo · Desde 2008',
     title: 'La regeneración celular<br> <span class="green">que respalda tu práctica.</span>',
-    subtitle: 'El arsenal regenerativo y estético más completo de México: péptidos y ultrafiltrados celulares, toxinas, rellenos, metabólicos y más — con tecnología S²RM®, certificación CE y registro COFEPRIS. Disponible para médicos verificados.',
+    subtitle: 'El arsenal regenerativo y estético más completo de México: péptidos y ultrafiltrados celulares, toxinas, rellenos, metabólicos y más — con tecnología S²RM®, certificación CE. Disponible para médicos verificados.',
     ctaPrimary: 'Ver el catálogo', ctaSecondary: 'Solicitar acceso',
     imageUrl: '', imageMobileUrl: '',
-    insignias: [{ titulo: 'Tecnología S²RM®', texto: 'moléculas liberadas por células madre · desde 2008' }, { titulo: 'Certificación CE · COFEPRIS', texto: 'grado europeo, registro sanitario vigente' }, { titulo: 'Reservado a verificados', texto: 'tu cédula es tu llave al portal' }],
+    insignias: [{ titulo: 'Tecnología S²RM®', texto: 'moléculas liberadas por células madre · desde 2008' }, { titulo: 'Certificación CE', texto: 'grado europeo' }, { titulo: 'Reservado a verificados', texto: 'tu cédula es tu llave al portal' }],
     // Una sola diapositiva = el hero de siempre (no rota). Al agregar más desde
     // Administración, el hero se convierte en carrusel automáticamente.
     slides: [], autoplayMs: 7000,
   },
-  ticker: ['S2RM® Technology', 'Systemic Stem Cell Released Molecules', 'CE Certificación EU', 'COFEPRIS Registro Sanitario', 'ISO 13485 Calidad médica'],
+  ticker: ['S2RM® Technology', 'Systemic Stem Cell Released Molecules', 'CE Certificación EU', 'ISO 13485 Calidad médica'],
   ciencia: {
     kicker: 'La ciencia', meta: '01 / 05 · Tecnología propietaria registrada',
     small: 'Stem Cell Released Molecules', title: 'Tecnología <span class="green">S2RM<span class="reg">®</span></span>', body: '<b>Systemic Stem Cell Released Molecules.</b> Moléculas liberadas por células madre humanas. Tecnología propietaria de Renovacell desde 2008.',
@@ -127,7 +127,7 @@ const DEFAULT: LandingContent = {
   },
   cumplimiento: {
     kicker: 'Cumplimiento regulatorio', title: 'Cumplimiento <span class="green">europeo y mexicano</span>', meta: '02 / 05 · Certificaciones vigentes', refEtiqueta: 'Ref.',
-    certs: [{ codigo: 'CE', estado: 'Vigente', nombre: 'Certificación Comunidad Europea', texto: 'Productos clínicos certificados bajo los más altos estándares de calidad de la Unión Europea.', ref: 'CE-RNVC-2008' }, { codigo: 'COFEPRIS', estado: 'Vigente', nombre: 'Registro Sanitario México', texto: 'Productos profesionales con registro sanitario vigente ante la autoridad regulatoria mexicana.', ref: 'COFEPRIS-2024' }, { codigo: 'ISO 13485', estado: 'Vigente', nombre: 'Sistema de gestión de calidad', texto: 'Norma internacional específica para fabricación de dispositivos y productos médicos.', ref: 'ISO-13485:2016' }, { codigo: 'GMP', estado: 'Vigente', nombre: 'Buenas Prácticas de Manufactura', texto: 'Producción bajo Good Manufacturing Practices certificadas a nivel internacional.', ref: 'GMP-RNVC-EU' }],
+    certs: [{ codigo: 'CE', estado: 'Vigente', nombre: 'Certificación Comunidad Europea', texto: 'Productos clínicos certificados bajo los más altos estándares de calidad de la Unión Europea.', ref: 'CE-RNVC-2008' }, { codigo: 'ISO 13485', estado: 'Vigente', nombre: 'Sistema de gestión de calidad', texto: 'Norma internacional específica para fabricación de dispositivos y productos médicos.', ref: 'ISO-13485:2016' }, { codigo: 'GMP', estado: 'Vigente', nombre: 'Buenas Prácticas de Manufactura', texto: 'Producción bajo Good Manufacturing Practices certificadas a nivel internacional.', ref: 'GMP-RNVC-EU' }],
   },
   catalogo: { kicker: 'El catálogo', title: 'Todo el arsenal regenerativo y estético, en un solo lugar.', body: 'Péptidos y ultrafiltrados celulares, toxinas, rellenos e hilos, vitaminas intravenosas, metabólicos de última generación, aparatología y más. Cada producto trae su ficha técnica — toca cualquiera para verla. Es solo informativa: la disponibilidad y los precios viven dentro del portal, reservados a médicos verificados.' },
   recursos: {
@@ -151,7 +151,7 @@ const DEFAULT: LandingContent = {
   contacto: { whatsapp: '5216671647799', email: 'Facturacion@goldenplacenta.com' },
   pie: {
     desc: 'Tecnología celular S²RM® de grado clínico. Estándares europeos y mexicanos desde 2008. Distribución exclusiva a profesionales de la salud.',
-    regs: [{ nombre: 'Certificación', valor: 'CE · Comunidad Europea' }, { nombre: 'Registro', valor: 'COFEPRIS · Vigente' }, { nombre: 'Calidad', valor: 'ISO 13485:2016' }],
+    regs: [{ nombre: 'Certificación', valor: 'CE · Comunidad Europea' }, { nombre: 'Calidad', valor: 'ISO 13485:2016' }],
     col1Titulo: '— Catálogo',
     categorias: ['Péptidos', 'Toxinas', 'Rellenos', 'Vitaminas', 'Peeling', 'Aparatología'],
     col2Titulo: '— México', mxNombre: 'Sede Culiacán', mxDir: 'Blvd. Pedro Infante 2911-E<br>Tres Ríos · 80020 Sinaloa',

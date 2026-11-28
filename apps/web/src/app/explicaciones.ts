@@ -74,7 +74,7 @@ export const EXPLICACIONES = {
       ['Lote', 'El número que trae la caja de fábrica. Todas las piezas del mismo lote se fabricaron juntas y caducan el mismo día.'],
       ['Recall', 'Retirar del mercado un lote con problema: avisar a quienes lo recibieron y recoger el producto.'],
     ],
-    nota: 'Es solo consulta: aquí no se cambia nada. Es el respaldo ante la autoridad sanitaria (COFEPRIS).',
+    nota: 'Es solo consulta: aquí no se cambia nada. Es el respaldo de a quién se vendió cada lote.',
   },
   mermas: {
     titulo: 'Mermas',

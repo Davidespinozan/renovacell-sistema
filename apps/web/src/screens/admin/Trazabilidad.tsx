@@ -1,4 +1,4 @@
-// TRAZABILIDAD (COFEPRIS). Responde en segundos dos preguntas del negocio:
+// TRAZABILIDAD. Responde en segundos dos preguntas del negocio:
 //  · "Seguir un lote" (recall): si un lote sale con problema, ¿A QUÉ CLIENTES
 //    llegó? — para avisarles. Incluye de dónde vino y qué queda.
 //  · "Revisar un pedido": ¿con qué lotes se surtió? (recall inverso).

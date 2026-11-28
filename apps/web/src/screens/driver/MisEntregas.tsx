@@ -10,7 +10,7 @@ import { telParaMarcar } from '../../lib/telefono'
 import { CobroEntrega } from './CobroEntrega'
 import { MiEfectivo } from './MiEfectivo'
 import { useRastreoRuta, usePantallaEncendida, leerPantallaEncendida, guardarPantallaEncendida } from '../../data/hooks/useRastreoRuta'   // CHOFER EN EL MAPA
-import { ubicacionChofer, ubicacionAhora } from '../../data/ops/ubicacionChofer'   // BLOQUE1 · efectivo que trae el chofer
+import { ubicacionChofer, ubicacionAhora, ubicacionConMotivo, type MotivoSinUbicacion } from '../../data/ops/ubicacionChofer'   // BLOQUE1 · efectivo que trae el chofer
 import { uploadPrivate, signedProofUrl } from '../../lib/uploads'
 import { FirmaEntrega } from './FirmaEntrega'   // FIRMA DE ENTREGA (23 nov 2026) · en lugar de la foto
 import { useShipments } from '../../data/hooks/useShipments'
@@ -212,16 +212,16 @@ export function MisEntregas() {
   // GPS EN LA ENTREGA (23 nov 2026, dueño: 3 entregas sin un solo punto) · antes de cerrar la entrega se lee la ubicación
   // y se guarda el punto de entrega. Sin ubicación, la app explica cómo activarla; como último recurso «Entregar sin
   // ubicación» con motivo (queda para la oficina). El dueño viendo todas las rutas no pasa por aquí.
-  const [sinUbic, setSinUbic] = useState<Record<string, boolean>>({})
+  const [sinUbic, setSinUbic] = useState<Record<string, false | MotivoSinUbicacion>>({})
   const [buscandoUbic, setBuscandoUbic] = useState<Record<string, boolean>>({})
   const [motivoUbic, setMotivoUbic] = useState<Record<string, string>>({})
   const ubicLista = useRef<Record<string, boolean>>({})
   const asegurarUbicacion = async (shipmentId: string): Promise<boolean> => {
     if (comoDueno || ubicLista.current[shipmentId]) return true
     setBuscandoUbic((b) => ({ ...b, [shipmentId]: true }))
-    const p = await ubicacionAhora(12_000)
+    const { p, motivo } = await ubicacionConMotivo(20_000)
     setBuscandoUbic((b) => ({ ...b, [shipmentId]: false }))
-    if (!p) { setSinUbic((m) => ({ ...m, [shipmentId]: true })); return false }
+    if (!p) { setSinUbic((m) => ({ ...m, [shipmentId]: motivo })); return false }
     void ubicacionChofer().registrar({ lat: p.coords.latitude, lng: p.coords.longitude, precision: p.coords.accuracy, tipo: 'entrega', shipmentId })
     ubicLista.current[shipmentId] = true
     setSinUbic((m) => ({ ...m, [shipmentId]: false }))
@@ -466,10 +466,19 @@ export function MisEntregas() {
                 </li>
               </ol>
               {sinUbic[s.id] && (
-                <div className="sysnote" role="alert" style={{ background: 'var(--warn-bg, #FFF7E6)', borderColor: 'var(--warn)', color: 'var(--ink)', marginTop: 8, flexDirection: 'column', alignItems: 'stretch', gap: 8 }} data-testid="ubic-falta">
-                  <b>📍 No pudimos leer tu ubicación. Actívala para entregar:</b>
-                  <span style={{ fontSize: 13 }}><b>Android:</b> toca el candado junto a la dirección (arriba) → Permisos → Ubicación → <b>Permitir</b>, y revisa que la ubicación del teléfono esté encendida.</span>
-                  <span style={{ fontSize: 13 }}><b>iPhone:</b> Ajustes → Privacidad → Localización → Safari → <b>Al usar la app</b>.</span>
+                <div className="sysnote" role="alert" style={{ background: 'var(--warn-bg, #FFF7E6)', borderColor: 'var(--warn)', color: 'var(--ink)', marginTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 8 }} data-testid="ubic-falta" data-motivo={sinUbic[s.id] || undefined}>
+                  {sinUbic[s.id] === 'permiso' ? (
+                    <>
+                      <b style={{ display: 'block' }}>📍 Esta página no tiene permiso de usar tu ubicación.</b>
+                      <span style={{ display: 'block', fontSize: 13 }}>Aunque la ubicación del teléfono esté encendida, el navegador también debe dar permiso a la página. <b>Android (Chrome):</b> toca el ícono junto a la dirección (arriba) → Permisos → Ubicación → <b>Permitir</b>.</span>
+                      <span style={{ display: 'block', fontSize: 13 }}><b>iPhone:</b> Ajustes → Privacidad → Localización → Safari → <b>Al usar la app</b>.</span>
+                    </>
+                  ) : (
+                    <>
+                      <b style={{ display: 'block' }}>📍 El teléfono no encontró tu ubicación a tiempo.</b>
+                      <span style={{ display: 'block', fontSize: 13 }}>El permiso está bien; pasa cuando el GPS no tiene señal (dentro de una casa, edificio o estacionamiento). Sal a donde se vea el cielo unos segundos y vuelve a intentar. En Android revisa también que la ubicación esté en <b>alta precisión</b>.</span>
+                    </>
+                  )}
                   <button className="btn sm" type="button" disabled={buscandoUbic[s.id]} onClick={() => void deliver(s.id, order.id, order.external_ref ?? order.id)} data-testid="ubic-reintentar">{buscandoUbic[s.id] ? 'Leyendo tu ubicación…' : 'Ya la activé: reintentar'}</button>
                   <span style={{ fontSize: 12, opacity: 0.85 }}>Si de plano no hay señal, entrega sin ubicación y escribe el motivo (queda registrado para la oficina):</span>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

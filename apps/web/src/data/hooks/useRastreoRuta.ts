@@ -1,7 +1,7 @@
 // CHOFER EN EL MAPA · mientras el chofer está EN RUTA y tiene la app abierta, manda su ubicación (a lo más cada ~50 s o
 // si se movió más de 150 m). Al salir de ruta o cerrar la pantalla, se detiene. Nunca frena al chofer.
 import { useEffect, useRef, useState } from 'react'
-import { ubicacionChofer } from '../ops/ubicacionChofer'
+import { ubicacionChofer, recordarPosicion } from '../ops/ubicacionChofer'
 
 export type EstadoRastreo = 'apagado' | 'activo' | 'denegado' | 'no_disponible'
 const api = ubicacionChofer()
@@ -51,6 +51,7 @@ export function useRastreoRuta(enRuta: boolean, cadaMs = 50_000): EstadoRastreo 
       id = navigator.geolocation.watchPosition(
         (p) => {
           setEstado('activo')
+          recordarPosicion(p)
           const ahora = Date.now(), pos = { lat: p.coords.latitude, lng: p.coords.longitude }
           const u = ultimo.current
           if (u && ahora - u.t < cadaMs && metros(u, pos) < 150) return

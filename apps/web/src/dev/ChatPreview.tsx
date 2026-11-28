@@ -13,8 +13,8 @@ const ayer = (seq: number, actor: Mensaje['actor'], content: string, propio = fa
 const base: Mensaje[] = [
   ayer(1, 'doctor', '¿Qué productos tienen para rejuvenecimiento facial?', true),
   ayer(2, 'ai', 'Para rejuvenecimiento facial manejamos la línea S2RM®: Golden Placenta Mask, el sérum de factores de crecimiento y el protocolo de bioestimulación. ¿Buscas algo para consultorio o para que el paciente use en casa?'),
-  msg(3, 'doctor', 'Para consultorio. ¿La mascarilla tiene registro COFEPRIS?', true, 20),
-  msg(4, 'ai', 'Sí. Golden Placenta Mask cuenta con registro COFEPRIS y certificación CE. Se aplica en cabina tras limpieza profunda; el protocolo completo son 6 sesiones.', false, 20),
+  msg(3, 'doctor', 'Para consultorio. ¿La mascarilla tiene certificación?', true, 20),
+  msg(4, 'ai', 'Sí. Golden Placenta Mask cuenta con certificación CE. Se aplica en cabina tras limpieza profunda; el protocolo completo son 6 sesiones.', false, 20),
 ]
 const conv = (x: Partial<Conversacion>): Conversacion => ({ conversation_id: 'C1', estado: 'abierta', modo: 'ai_active', rol: 'dueno', ultimo_seq: 4, leido_hasta: 4, mensajes: base, asesor_nombre: null, handoff: { origen: null, cart_id: null, fuera_horario: null, asignado: false, puede_rechazar: false }, ...x })
 

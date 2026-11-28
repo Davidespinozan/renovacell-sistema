@@ -76,3 +76,29 @@ export async function registrarGuiaManual(args: { paqueteria: PaqManual; orderId
     ...(args.paquete ? { paquete: args.paquete } : {}),
   })
 }
+
+// GUÍA HECHA FUERA DEL SISTEMA (28 nov 2026, Alberto: «como estas no se hicieron con la API, ocupo agregar las guías
+// manual, para llevar el mismo control»). DHL y T1 tienen API, pero a veces la guía se hace en su portal. Aquí se
+// registra a mano con el mismo proveedor (así DHL se sigue rastreando solo) y queda marcada como manual.
+export type ProveedorConApi = 'dhl' | 't1'
+export const NOMBRE_CON_API: Record<ProveedorConApi, string> = { dhl: 'DHL', t1: 'T1 Envíos' }
+
+/** Número de guía hecho fuera: 4 a 30 letras, números o guiones (se guarda en mayúsculas, sin espacios). */
+export function validarGuiaFuera(p: ProveedorConApi, raw: string): { ok: true; guia: string } | { ok: false; error: string } {
+  const g = String(raw ?? '').toUpperCase().replace(/\s+/g, '')
+  if (!g) return { ok: false, error: `Escribe el número de guía de ${NOMBRE_CON_API[p]}.` }
+  if (!/^[A-Z0-9-]{4,30}$/.test(g)) return { ok: false, error: 'La guía lleva de 4 a 30 letras, números o guiones.' }
+  return { ok: true, guia: g }
+}
+
+export async function registrarGuiaFuera(args: { proveedor: ProveedorConApi; paqueteria?: string | null; orderId: string; guia: string; costo: number | null; llegaFecha: string | null; registradoPor: string | null; paquete?: number }, crear: typeof createShipment = createShipment): Promise<EnvioCreado> {
+  const paq = String(args.paqueteria ?? '').trim().slice(0, 40)
+  const carrier = args.proveedor === 't1' ? (paq ? `${paq} (T1)` : 'T1 Envíos') : 'DHL'
+  return crear({
+    order_id: args.orderId, carrier, tracking_number: args.guia, driver_id: null, label_url: null,
+    estimated_delivery_at: estimadaDeFecha(args.llegaFecha), status: 'in_transit',
+    provider: args.proveedor, provider_cost: args.costo, currency: args.costo != null ? 'MXN' : null,
+    provider_meta: { manual: true, fuera_del_sistema: true, registrado_por: args.registradoPor, ...(args.proveedor === 't1' && paq ? { paqueteria: paq } : {}) },
+    ...(args.paquete ? { paquete: args.paquete } : {}),
+  })
+}

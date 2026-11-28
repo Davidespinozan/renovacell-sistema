@@ -69,12 +69,32 @@ export const ubicacionChofer = (rpc: Rpc = rpcPorDefecto) => ({
 /** Enlace a OpenStreetMap con marcador (abre en el navegador o la app de mapas). */
 export const enlaceMapa = (lat: number, lng: number): string => `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`
 
-/** Ubicación de una sola vez (para la entrega). null si no hay permiso / GPS / tarda más de `ms`. */
-export function ubicacionAhora(ms = 8000): Promise<GeolocationPosition | null> {
-  return new Promise((res) => {
-    try {
-      if (typeof navigator === 'undefined' || !navigator.geolocation) { res(null); return }
-      navigator.geolocation.getCurrentPosition((p) => res(p), () => res(null), { enableHighAccuracy: true, timeout: ms, maximumAge: 60_000 })
-    } catch { res(null) }
-  })
+// UBICACIÓN EN LA ENTREGA (28 nov 2026, Manuela: «tengo la ubicación activada y me sale que no se pudo leer»). Antes se
+// pedía SOLO el GPS fino con 12 s: dentro de una casa o edificio el GPS no engancha a tiempo y se rendía aunque el
+// permiso estuviera dado. Ahora: (1) la última posición que ya mandó el rastreo de ruta si es reciente; (2) una lectura
+// rápida por red/wifi (aceptando una de hasta 10 min); (3) el GPS fino. Y se distingue «sin permiso» de «no encontró».
+let ultimaConocida: { p: GeolocationPosition; t: number } | null = null
+/** El rastreo de ruta guarda aquí cada posición que recibe (la entrega la reutiliza si es reciente). */
+export function recordarPosicion(p: GeolocationPosition): void { ultimaConocida = { p, t: Date.now() } }
+
+export type MotivoSinUbicacion = 'permiso' | 'no_encontro' | 'no_disponible'
+const leer = (opc: PositionOptions): Promise<{ p: GeolocationPosition | null; code: number | null }> => new Promise((res) => {
+  try { navigator.geolocation.getCurrentPosition((p) => res({ p, code: null }), (e) => res({ p: null, code: e?.code ?? 2 }), opc) } catch { res({ p: null, code: 2 }) }
+})
+
+/** Ubicación para la entrega con el motivo si no se pudo. `ms` = tiempo total aproximado. */
+export async function ubicacionConMotivo(ms = 20_000, recienteMs = 3 * 60_000): Promise<{ p: GeolocationPosition; motivo: null } | { p: null; motivo: MotivoSinUbicacion }> {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) return { p: null, motivo: 'no_disponible' }
+  if (ultimaConocida && Date.now() - ultimaConocida.t < recienteMs) return { p: ultimaConocida.p, motivo: null }
+  const rapida = await leer({ enableHighAccuracy: false, timeout: Math.min(6_000, ms), maximumAge: 10 * 60_000 })
+  if (rapida.p) { recordarPosicion(rapida.p); return { p: rapida.p, motivo: null } }
+  if (rapida.code === 1) return { p: null, motivo: 'permiso' }
+  const fina = await leer({ enableHighAccuracy: true, timeout: Math.max(4_000, ms - 6_000), maximumAge: 60_000 })
+  if (fina.p) { recordarPosicion(fina.p); return { p: fina.p, motivo: null } }
+  return { p: null, motivo: fina.code === 1 ? 'permiso' : 'no_encontro' }
+}
+
+/** Ubicación de una sola vez (para la entrega). null si no hay permiso / no se encontró. */
+export async function ubicacionAhora(ms = 8000): Promise<GeolocationPosition | null> {
+  return (await ubicacionConMotivo(ms)).p
 }

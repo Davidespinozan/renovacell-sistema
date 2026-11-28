@@ -75,7 +75,7 @@ export function RemisionView({ order, envio, enlace = null }: { order: OrderWith
       {/* AUTOFACTURA: el cliente pide su factura con este código (la remisión es el papel que recibe con su paquete). */}
       <QRFactura enlace={enlace} />
       <div className="rfoot">
-        <div className="note">Producto regulado · trazabilidad por lote (COFEPRIS). Conserva esta remisión.</div>
+        <div className="note">Producto con trazabilidad por lote. Conserva esta remisión.</div>
         <Icon name="shield" style={{ width: 22, height: 22, color: 'var(--green-deep)' }} />
       </div>
     </div>
