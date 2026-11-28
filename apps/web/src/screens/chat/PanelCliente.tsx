@@ -37,7 +37,14 @@ import { resumenPaqueteria, verConfigEntrega } from '../../data/ops/entrega'   /
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
 const iniciales = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?'
-const textoAcceso = (nombre: string, enlace: string) => `Hola ${primerNombre(nombre) || nombre}, te dejo tu acceso al portal de Renovacell. Como ya eres cliente, tu cuenta queda verificada: ahí ves precios, haces pedidos y sigues hablando conmigo. Crea tu contraseña aquí: ${enlace}`
+// ACCESO EDITABLE (28 nov 2026, Roberto: en una conversación ya empezada salía «Hola X…» como si fuera el primer contacto).
+// El texto se puede cambiar antes de mandarlo; [enlace] marca dónde va el enlace (si lo borran, se agrega al final).
+export const MARCA_ENLACE = '[enlace]'
+export const textoAcceso = (nombre: string, enlace: string = MARCA_ENLACE) => `${primerNombre(nombre) || nombre}, te dejo tu acceso al portal de Renovacell. Como ya eres cliente, tu cuenta queda verificada: ahí ves precios, haces pedidos y sigues hablando conmigo. Crea tu contraseña aquí: ${enlace}`
+export function conEnlace(texto: string, enlace: string): string {
+  const t = texto.trim()
+  return t.includes(MARCA_ENLACE) ? t.split(MARCA_ENLACE).join(enlace) : `${t}\n${enlace}`
+}
 
 interface Props {
   conversationId: string
@@ -211,16 +218,19 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
     if (!r.ok) { setMsg({ ok: false, texto: r.mensaje }); return }
     setSeg(null); cerrarHoja(conversationId); setMsg({ ok: true, texto: 'Seguimiento marcado como hecho.' })
   }
+  const [textoAccesoEd, setTextoAccesoEd] = useState<string | null>(null)
   const mandarAcceso = async () => {
     if (!ficha?.customer_id || !chat) return
     const nombre = capitalizarNombre(ficha.nombre ?? '')
+    const plantilla = (textoAccesoEd ?? textoAcceso(nombre)).trim()
+    if (plantilla.replace(MARCA_ENLACE, '').trim().length < 3) { setMsg({ ok: false, texto: 'Escribe el mensaje que acompaña al enlace.' }); return }
     setOcupado(true); setMsg(null)
     const inv = await crearInvitacion(ficha.customer_id)
     if (!inv.ok) { setOcupado(false); setMsg({ ok: false, texto: inv.mensaje }); return }
-    const r = await chat.enviar(conversationId, textoAcceso(nombre, inv.data.enlace))
+    const r = await chat.enviar(conversationId, conEnlace(plantilla, inv.data.enlace))
     setOcupado(false)
     if (!r.ok) { setMsg({ ok: false, texto: `Se creó la invitación, pero no se pudo enviar por aquí: ${r.error.mensaje}` }); return }
-    cerrarHoja(conversationId)
+    cerrarHoja(conversationId); setTextoAccesoEd(null)
     setMsg({ ok: true, texto: 'Le mandaste su acceso al portal. Cuando cree su contraseña, su cuenta queda ligada a esta ficha.' })
     await cargar()
   }
@@ -429,7 +439,9 @@ export function usePanelCliente({ conversationId, chat, onCambio, cliente = expe
   )
   else if (hoja === 'pc:acceso' && ficha.vinculado) cuerpo = (
     <HojaMarco titulo={ficha.invitacion_vigente ? 'Reenviar acceso al portal' : 'Mandar acceso al portal'} sub={`Confirma que hablas con ${nombre}: su cuenta queda verificada y ligada a esta ficha.`} onCerrar={cerrar} testid="pc-hoja-acceso">
-      <div className="pc-previa" aria-label="Lo que le llega">{textoAcceso(nombre, '[enlace para crear su contraseña]')}</div>
+      <label style={{ fontSize: 12.5, color: 'var(--ink-3)' }} htmlFor="pc-acceso-texto">Lo que le llega (puedes cambiarlo; <b>{MARCA_ENLACE}</b> es donde va el enlace)</label>
+      <textarea id="pc-acceso-texto" className="pc-campo" rows={5} style={{ resize: 'vertical', lineHeight: 1.45 }} value={textoAccesoEd ?? textoAcceso(nombre)}
+        onChange={(e) => setTextoAccesoEd(e.target.value)} data-testid="pc-acceso-texto" />
       {aviso}
       <div className="pc-acciones"><button type="button" className="btn" disabled={ocupado} onClick={() => void mandarAcceso()} data-testid="pc-acceso"><Send size={15} /> Mandar por este chat</button></div>
     </HojaMarco>

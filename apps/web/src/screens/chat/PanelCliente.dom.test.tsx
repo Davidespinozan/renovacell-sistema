@@ -48,10 +48,13 @@ describe('PanelCliente', () => {
     render(<PanelCliente conversationId="C1" cliente={c} chat={{ enviar } as unknown as ClienteChat} />)
     expect(await screen.findByText('Sin cuenta')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('accion-acceso'))
-    expect(screen.getByLabelText('Lo que le llega')).toHaveTextContent(/Hola Lourdes, te dejo tu acceso/)   // ve lo que le va a llegar
+    const caja = screen.getByTestId('pc-acceso-texto') as HTMLTextAreaElement
+    expect(caja.value).toMatch(/^Lourdes, te dejo tu acceso/)   // ve lo que le va a llegar, sin «Hola» de primer contacto
+    // ACCESO EDITABLE (Roberto): lo cambia antes de mandarlo; [enlace] se vuelve el enlace real
+    fireEvent.change(caja, { target: { value: 'Como te comenté, aquí está tu acceso: [enlace] Cualquier duda me dices.' } })
     fireEvent.click(screen.getByTestId('pc-acceso'))
     await waitFor(() => expect(enviar).toHaveBeenCalled())
-    expect(String((enviar.mock.calls[0] as unknown[])[1])).toMatch(/Crea tu contraseña aquí: https:\/\/sistema\.renovacell\.mx\/invitacion\?t=abc/)
+    expect(String((enviar.mock.calls[0] as unknown[])[1])).toBe('Como te comenté, aquí está tu acceso: https://sistema.renovacell.mx/invitacion?t=abc Cualquier duda me dices.')
     expect(await screen.findByTestId('pc-msg')).toHaveTextContent(/Le mandaste su acceso/)
   })
   it('doctor con cuenta y sin ficha: no estorba (lo atiende Por verificar)', async () => {
