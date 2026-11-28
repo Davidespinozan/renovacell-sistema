@@ -67,11 +67,8 @@ export function RemisionView({ order, envio, enlace = null }: { order: OrderWith
           <tfoot><tr><td colSpan={2}>Total de piezas</td><td className="mono">{piezas} {piezas === 1 ? 'pza' : 'pzas'}</td></tr></tfoot>
         </table>
       </div>
-      {/* Acuse: quien recibe confirma que llegó completo (útil ante una reclamación de faltantes). */}
-      <div className="rfirma">
-        <div>Recibí completo y en buen estado · Nombre y firma</div>
-        <div>Fecha</div>
-      </div>
+      {/* Sin línea de firma (28 nov 2026, dueño): la remisión viaja dentro de la caja y no regresa; el acuse real es la firma
+          en el celular del chofer al entregar («Ver prueba») o el rastreo de la guía. */}
       {/* AUTOFACTURA: el cliente pide su factura con este código (la remisión es el papel que recibe con su paquete). */}
       <QRFactura enlace={enlace} />
       <div className="rfoot">

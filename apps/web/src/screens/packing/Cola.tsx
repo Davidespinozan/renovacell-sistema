@@ -19,7 +19,7 @@ import { quoteShipment, createShipmentReal, NOMBRE_PROVEEDOR, type RateQuote, ty
 // PAQ-AUTOBÚS (24 nov 2026) · ETN, Unidos de Sinaloa y Norte de Sinaloa: guía manual, igual que Estafeta.
 type GuiaCon = ProveedorPaqueteria | PaqManual
 const GUIAS_CON: GuiaCon[] = ['dhl', 'estafeta', 'etn', 'tus', 'tns', 't1']
-const NOMBRE_GUIA: Record<GuiaCon, string> = { ...NOMBRE_PROVEEDOR, estafeta: 'Estafeta (guía manual)', etn: 'ETN (manual)', tus: 'Unidos de Sinaloa (manual)', tns: 'Norte de Sinaloa (manual)' }
+const NOMBRE_GUIA: Record<GuiaCon, string> = { ...NOMBRE_PROVEEDOR, estafeta: 'Estafeta (guía manual)', etn: 'ETN (manual)', tus: 'Unidos de Sinaloa (manual)', tns: 'Norte de Sinaloa (manual)', t1: 'T1 Envíos (manual)' }
 import { orderAddress } from '../../data/ops/shippingAddress'
 import { shipperFromCompany } from '../../data/shipping/shipper'
 import { currentCompany } from '../../data/store/companyStore'
@@ -251,7 +251,8 @@ export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWith
   const manual: PaqManual | null = esPaqManual(proveedor) ? proveedor : null   // PAQ-AUTOBÚS · paquetería sin API: guía a mano
   // GUÍA HECHA FUERA (28 nov 2026, Alberto) · DHL o T1 con la guía ya hecha en su portal: se registra a mano.
   const [aMano, setAMano] = useState(false)
-  const fuera: ProveedorConApi | null = !manual && aMano && (proveedor === 'dhl' || proveedor === 't1') ? proveedor : null
+  // T1 (28 nov 2026, dueño): no está conectado por API; su guía SIEMPRE se captura a mano.
+  const fuera: ProveedorConApi | null = manual ? null : proveedor === 't1' ? 't1' : aMano && proveedor === 'dhl' ? 'dhl' : null
   const nombreAMano = manual ? PAQ_MANUALES[manual] : fuera ? NOMBRE_CON_API[fuera] : ''
   const [paqT1, setPaqT1] = useState('')
   const [doneRecoge, setDoneRecoge] = useState(false)
@@ -534,7 +535,7 @@ export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWith
                     </div>
                     {prometido && (
                       <div style={{ fontSize: 12.5, marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'var(--ok-bg)' }} data-testid="paqueteria-vendida">
-                        <b>Se vendió: {prometido}.</b> {proveedor === 'dhl' ? 'Elige el servicio de DHL que llegue a tiempo.' : proveedor === 'estafeta' ? 'Haz la guía en el portal de Estafeta y regístrala aquí.' : manual ? `Lleva el paquete a ${PAQ_MANUALES[manual]} y registra aquí el número de guía.` : ''}
+                        <b>Se vendió: {prometido}.</b> {proveedor === 'dhl' ? 'Elige el servicio de DHL que llegue a tiempo.' : proveedor === 'estafeta' ? 'Haz la guía en el portal de Estafeta y regístrala aquí.' : proveedor === 't1' ? 'Haz la guía en el portal de T1 y regístrala aquí.' : manual ? `Lleva el paquete a ${PAQ_MANUALES[manual]} y registra aquí el número de guía.` : ''}
                       </div>
                     )}
                     {entregaPedido?.paqueteria && entregaPedido.paqueteria !== 'chofer' && entregaPedido.paqueteria !== proveedor && (
@@ -550,10 +551,10 @@ export function AsignarModal({ order, onClose, paquete = 0 }: { order: OrderWith
                     </span>
                   </div>
 
-                  {!manual && (proveedor === 'dhl' || proveedor === 't1') && (
+                  {proveedor === 'dhl' && (
                     <div style={{ marginBottom: 12 }}>
                       <button type="button" className="btn ghost sm" data-testid="guia-a-mano" onClick={() => { setAMano((v) => !v); setError(null); setRates(null) }}>
-                        {aMano ? `Cotizar y generar con ${NOMBRE_CON_API[proveedor as ProveedorConApi]} desde aquí` : `¿Ya hiciste la guía en el portal de ${NOMBRE_CON_API[proveedor as ProveedorConApi]}? Regístrala a mano`}
+                        {aMano ? 'Cotizar y generar con DHL desde aquí' : '¿Ya hiciste la guía en el portal de DHL? Regístrala a mano'}
                       </button>
                     </div>
                   )}

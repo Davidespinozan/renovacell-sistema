@@ -1,66 +1,49 @@
 // @vitest-environment jsdom
-// T1 · en Empaque, "Generar la guía con" elige DHL directo o T1 Envíos; lo vendido sugiere; cotizar y generar mandan el
-// proveedor al servidor; si T1 no tiene llaves, el mensaje lo dice en palabras.
+// T1 · (28 nov 2026, dueño) T1 NO está conectado por API: su guía siempre se captura a mano. DHL cotiza y genera, y también
+// acepta registrar a mano una guía hecha en su portal (Alberto).
 import React from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 
-const srv = vi.hoisted(() => ({ quote: vi.fn(), create: vi.fn() }))
+const srv = vi.hoisted(() => ({ quote: vi.fn(), create: vi.fn(), crearEnvio: vi.fn(async (x: unknown) => ({ ok: true, shipment: { ...(x as object), id: 's1' } })) }))
 vi.mock('../../data/shipping/provider', async (orig) => ({ ...(await orig<typeof import('../../data/shipping/provider')>()), quoteShipment: srv.quote, createShipmentReal: srv.create }))
 vi.mock('../../data/shipping/shipper', () => ({ shipperFromCompany: () => ({ config: { name: 'Renovacell', addressLine1: 'Blvd 1', city: 'Culiacán', state: 'Sin', cp: '80000', country: 'MX', phone: '6671112233', email: 'a@b.mx' } }) }))
-vi.mock('../../data/hooks/useShipments', () => ({ useShipments: () => ({ createShipment: vi.fn(async () => ({ ok: true })) }) }))
+vi.mock('../../data/hooks/useShipments', () => ({ useShipments: () => ({ createShipment: srv.crearEnvio }) }))
 vi.mock('../../data/ops/empaques', () => ({ listarEmpaques: async () => ({ ok: true, data: [] }), medidasTexto: () => '' }))
 vi.mock('../../data/store/driversStore', () => ({ getDrivers: () => [] }))
 import { AsignarModal, mensajeProveedor } from './Cola'
-beforeEach(() => { cleanup(); srv.quote.mockReset(); srv.create.mockReset() })
+beforeEach(() => { cleanup(); srv.quote.mockReset(); srv.create.mockReset(); srv.crearEnvio.mockClear() })
 
 const ORDER = { id: 'o1', external_ref: 'S100002', status: 'packed', created_at: '2026-10-20T10:00:00Z', items: [],
   shipping_meta: { customer: { name: 'Dra. Ana Ruiz', phone: '5512345678' }, address: { line1: 'Av. Reforma 123', colonia: 'Centro', cp: '06600', city: 'Ciudad de México', state: 'CDMX', phone: '5512345678' },
     entrega: { opcion: 'foraneo_t1', tipo: 'foraneo', paqueteria: 't1', texto: 'Envío por T1', flete: 0, flete_regla: 0, salida: '2026-10-21', llega_desde: '2026-10-23', llega_hasta: '2026-10-26' } } } as never
 
-describe('T1 · proveedor de la guía en Empaque', () => {
-  it('lo vendido sugiere T1; cotizar manda provider t1; cambiar a DHL avisa que se vendió con otro', async () => {
-    srv.quote.mockResolvedValue([{ id: 'FEDEX|GROUND', serviceCode: 'FEDEX|GROUND', carrier: 'FedEx', service: 'Terrestre', amount: 140, currency: 'MXN', etaDays: 4 }])
+describe('T1 · siempre guía manual', () => {
+  it('lo vendido sugiere T1 y se abre directo la captura a mano, sin cotizar', async () => {
     render(<AsignarModal order={ORDER} onClose={() => {}} />)
     expect(screen.getByTestId('proveedor-t1').className).toBe('active')
-    for (const [l, v] of [['Peso en kilogramos', '1'], ['Largo en centímetros', '30'], ['Ancho en centímetros', '20'], ['Alto en centímetros', '10']]) fireEvent.change(screen.getByLabelText(l), { target: { value: v } })
-    fireEvent.click(screen.getByRole('button', { name: /Cotizar envío/ }))
-    await waitFor(() => expect(srv.quote).toHaveBeenCalledTimes(1))
-    expect(srv.quote.mock.calls[0][4]).toBe('t1'); expect(srv.quote.mock.calls[0][5]).toBe('o1')   // el pedido viaja: el servidor toma de ahí el valor de la mercancía
-    expect(await screen.findByText(/FedEx/)).toBeTruthy()
+    expect(screen.getByTestId('proveedor-t1')).toHaveTextContent('T1 Envíos (manual)')
+    expect(screen.getByTestId('estafeta-manual')).toHaveTextContent(/portal de T1 Envíos/)
+    expect(screen.queryByRole('button', { name: /Cotizar envío/ })).toBeNull()
+    fireEvent.change(screen.getByTestId('t1-paqueteria'), { target: { value: 'FedEx' } })
+    fireEvent.change(screen.getByTestId('estafeta-guia'), { target: { value: 'fx 12345' } })
+    fireEvent.click(screen.getByTestId('estafeta-guardar'))
+    await waitFor(() => expect(srv.crearEnvio).toHaveBeenCalledTimes(1))
+    expect(srv.crearEnvio.mock.calls[0][0]).toMatchObject({ provider: 't1', carrier: 'FedEx (T1)', tracking_number: 'FX12345', provider_meta: { manual: true, fuera_del_sistema: true } })
+    expect(srv.quote).not.toHaveBeenCalled()
+  })
+  it('DHL cotiza; con «Regístrala a mano» captura la guía hecha en su portal', async () => {
+    render(<AsignarModal order={ORDER} onClose={() => {}} />)
     fireEvent.click(screen.getByTestId('proveedor-dhl'))
     expect(screen.getByTestId('proveedor-guia')).toHaveTextContent(/Se vendió con T1; estás generando con otra paquetería/)
-    expect(screen.queryByText(/FedEx/)).toBeNull()   // al cambiar de proveedor se recotiza
+    expect(screen.getByRole('button', { name: /Cotizar envío/ })).toBeTruthy()
+    fireEvent.click(screen.getByTestId('guia-a-mano'))
+    fireEvent.change(screen.getByTestId('estafeta-guia'), { target: { value: '1234567890' } })
+    fireEvent.click(screen.getByTestId('estafeta-guardar'))
+    await waitFor(() => expect(srv.crearEnvio).toHaveBeenCalledTimes(1))
+    expect(srv.crearEnvio.mock.calls[0][0]).toMatchObject({ provider: 'dhl', carrier: 'DHL', tracking_number: '1234567890' })
   })
-  it('T1 sin llaves: mensaje en palabras, nada de guía mock', async () => {
-    srv.quote.mockRejectedValue(new Error('t1_not_configured'))
-    render(<AsignarModal order={ORDER} onClose={() => {}} />)
-    for (const [l, v] of [['Peso en kilogramos', '1'], ['Largo en centímetros', '30'], ['Ancho en centímetros', '20'], ['Alto en centímetros', '10']]) fireEvent.change(screen.getByLabelText(l), { target: { value: v } })
-    fireEvent.click(screen.getByRole('button', { name: /Cotizar envío/ }))
-    expect(await screen.findByText(/T1 Envíos no está configurado en el servidor/)).toBeTruthy()
+  it('los mensajes del servidor siguen en palabras', () => {
     expect(mensajeProveedor('shipping_not_configured')).toMatch(/DHL no está configurado/); expect(mensajeProveedor('otro')).toBe('otro')
-  })
-  it('una guía de sandbox se marca como ambiente de pruebas, nunca como envío real', async () => {
-    srv.quote.mockResolvedValue([{ id: 'FEDEX|GROUND', serviceCode: 'FEDEX|GROUND', carrier: 'FedEx', service: 'Terrestre', amount: 140, currency: 'MXN', etaDays: 4 }])
-    srv.create.mockResolvedValue({ label: { provider: 't1', ambiente: 'test', carrier: 'FedEx', service: 'Terrestre', serviceCode: 'FEDEX|GROUND', tracking: 'SBX123', labelUrl: 'https://x/l.pdf', amount: 140, etaDays: 4, estimatedDeliveryAt: '2026-10-25T00:00:00Z' } })
-    render(<AsignarModal order={ORDER} onClose={() => {}} />)
-    for (const [l, v] of [['Peso en kilogramos', '1'], ['Largo en centímetros', '30'], ['Ancho en centímetros', '20'], ['Alto en centímetros', '10']]) fireEvent.change(screen.getByLabelText(l), { target: { value: v } })
-    fireEvent.click(screen.getByRole('button', { name: /Cotizar envío/ }))
-    await screen.findByText(/FedEx/)
-    fireEvent.click(screen.getByRole('button', { name: /Generar guía/ }))
-    expect(await screen.findByTestId('guia-sandbox')).toHaveTextContent(/ambiente de pruebas: no es un envío real/)
-    expect(await screen.findByText(/el pedido NO se marcó como enviado/)).toBeTruthy()   // ni "va en camino" al cliente
-    expect(srv.create.mock.calls[0][0].provider).toBe('t1'); expect(srv.create.mock.calls[0][0].rate.amount).toBe(140)   // el total que vio el operador viaja para confirmarse en el servidor
-  })
-  it('si el servidor reporta cambio de precio, no hay guía y el mensaje pide recotizar', async () => {
-    srv.quote.mockResolvedValue([{ id: 'DHL|EXPRESS_DOMESTIC', serviceCode: 'DHL|EXPRESS_DOMESTIC', carrier: 'DHL', service: 'Express · Dia Siguiente', amount: 376.16, currency: 'MXN', etaDays: 1 }])
-    srv.create.mockRejectedValue(new Error('T1 cambió el total de DHL · Express · Dia Siguiente: de $376.16 a $390.00. Vuelve a cotizar y confirma antes de generar la guía.'))
-    render(<AsignarModal order={ORDER} onClose={() => {}} />)
-    for (const [l, v] of [['Peso en kilogramos', '1'], ['Largo en centímetros', '30'], ['Ancho en centímetros', '20'], ['Alto en centímetros', '10']]) fireEvent.change(screen.getByLabelText(l), { target: { value: v } })
-    fireEvent.click(screen.getByRole('button', { name: /Cotizar envío/ }))
-    await screen.findByText(/Express · Dia Siguiente/)
-    fireEvent.click(screen.getByRole('button', { name: /Generar guía/ }))
-    expect(await screen.findByText(/T1 cambió el total[^]*Vuelve a cotizar/)).toBeTruthy()
-    expect(screen.queryByTestId('guia-sandbox')).toBeNull()
   })
 })
