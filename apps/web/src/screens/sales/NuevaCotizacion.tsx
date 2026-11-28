@@ -13,11 +13,12 @@ import { useInfoMayoreo } from '../../data/hooks/useInfoMayoreo'
 import { AvisoAhorroVolumen } from '../../app/AvisoAhorroVolumen'
 import { cotizaciones as clientePorDefecto, textoCotizacion, type ClienteCotizaciones, type Cotizacion } from '../../data/ops/cotizaciones'
 import type { ClienteChat } from '../../data/ops/chat'
+import { whatsappCon } from '../../data/ops/busqueda'
 import { capitalizarNombre, primerNombre } from '../../lib/nombres'
 
 export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCreada, cliente = clientePorDefecto, acoplado = false, oculto = false }: {
   acoplado?: boolean; oculto?: boolean   // PANTALLA DIVIDIDA · ver NuevoPedido
-  customer: { id: string; name: string; email?: string | null }
+  customer: { id: string; name: string; email?: string | null; phone?: string | null }
   conversationId?: string | null
   chat?: ClienteChat                 // para mandarla por la misma conversación (WhatsApp)
   onClose: () => void
@@ -67,6 +68,13 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
     if (e.ok) await cliente.enviar(hecha.id, 'chat')
     setOcupado(false)
     setMsg(e.ok ? { ok: true, texto: 'Se la mandaste por este chat.' } : { ok: false, texto: `No se pudo mandar por el chat: ${e.error.mensaje}` })
+  }
+  // COTIZAR DESDE INICIO (28 nov 2026) · fuera del chat, se manda por WhatsApp con el texto listo.
+  const porWhatsApp = () => {
+    if (!hecha) return
+    window.open(whatsappCon(customer.phone ?? null, textoCotizacion(hecha, primerNombre(capitalizarNombre(customer.name)) || undefined)), '_blank', 'noopener')
+    void cliente.enviar(hecha.id, 'chat')
+    setMsg({ ok: true, texto: 'Se abrió WhatsApp con la cotización lista. Queda en «Cotizaciones por cerrar» de tu Inicio.' })
   }
   const porCorreo = async () => {
     if (!hecha) return
@@ -124,7 +132,8 @@ export function NuevaCotizacion({ customer, conversationId, chat, onClose, onCre
                 <li className="tot"><span>Total</span><b className="mono">{money(hecha.total)}</b></li>
               </ul>
               <div className="cot-envio">
-                {chat && conversationId && <button type="button" className="btn" disabled={ocupado} onClick={() => void porChat()} data-testid="cot-chat"><Send size={15} /> Mandar por este chat</button>}
+                {chat && conversationId ? <button type="button" className="btn" disabled={ocupado} onClick={() => void porChat()} data-testid="cot-chat"><Send size={15} /> Mandar por este chat</button>
+                  : <button type="button" className="btn" disabled={ocupado} onClick={porWhatsApp} data-testid="cot-whatsapp"><Send size={15} /> Mandar por WhatsApp</button>}
                 <button type="button" className="btn ghost" disabled={ocupado} onClick={() => void porCorreo()} data-testid="cot-correo"><Mail size={15} /> Mandar por correo</button>
               </div>
             </>

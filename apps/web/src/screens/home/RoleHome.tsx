@@ -31,7 +31,7 @@ import { SelectorClienteVentas } from '../pos/SelectorCliente'
 import { BuscadorClientes } from '../../data/ops/buscarClientes'
 import { NuevoPedido } from '../sales/NuevoPedido'
 import { CobrarPedido } from '../cobros/LinksPago'
-import { pedidosPorConfirmar } from '../../data/ops/porConfirmar'
+import { pedidosPorConfirmar, pedidosPorCobrarSinConfirmar } from '../../data/ops/porConfirmar'
 import { etapaSeguimiento, useSeguimiento } from '../../data/ops/seguimientoVenta'
 import { seSurteSinPago, statusView } from '../doctor/orderStatus'
 import { esRecoge } from '../../data/ops/seguimiento'
@@ -53,6 +53,7 @@ import { carteraPlazos, textoPlazo, textoSinCompra, tonoPlazo, type ClientePlazo
 import { fmtDate, money } from '../../lib/format'
 import { diaNegocio, hoyNegocio } from '../../data/periodo'
 import { abrirMisVentas } from '../sales/MisVentas'
+import { BotonCotizar, CotizacionesPorCerrar } from './CotizacionesInicio'   // COTIZACIONES EN INICIO
 
 export function RoleHome() {
   const { role } = useRole()
@@ -115,6 +116,7 @@ export function HomeVendedor() {
       <button type="button" className="btn rh-vender" onClick={() => { buscador.current ??= new BuscadorClientes(); setEligiendo(true) }} data-testid="inicio-levantar-pedido">
         <Icon name="plus" /> Levantar pedido
       </button>
+      <BotonCotizar />
       {porConfirmar.length > 0 && (
         <Seccion titulo="Esperan pago para pasar a Almacén" nivel="atencion" conteo={porConfirmar.length} id="por-confirmar"
           accion={porConfirmar.length > 4 ? { label: `Ver los ${porConfirmar.length}`, onClick: () => setScreen('links_pago') } : undefined}>
@@ -131,6 +133,7 @@ export function HomeVendedor() {
           </div>
         </Seccion>
       )}
+      <CotizacionesPorCerrar equipo={capabilities.includes('jefe_ventas')} />
       {eligiendo && buscador.current && (
         <SelectorClienteVentas paraPedido buscador={buscador.current} onClose={() => setEligiendo(false)} onPick={(c) => { setEligiendo(false); if (c) setPedidoPara({ id: c.id, name: c.name }) }} />
       )}
@@ -297,6 +300,54 @@ function OfrecerPromo({ onVer, cargar = oportunidadesPromo }: { onVer: () => voi
 // ── DIRECCIÓN ─────────────────────────────────────────────────────────────────────────────────────────
 // Lo que NO avanza hasta que Dirección decide: cancelar un pedido, validar un pago reportado, resolver un reembolso,
 // decidir el destino de una devolución y qué hacer con un pago de más. El resto de la bandeja se vigila.
+/** A QUIÉN COBRAR, PARA DIRECCIÓN (28 nov 2026, dueño: «el Inicio de los vendedores se me hace mejor; en Dirección no les
+ * aparece tan fácil el ver a quién cobrar»). Lo mismo que ve la vendedora, de TODO el equipo y con quién lo vendió:
+ * (1) los que esperan pago para pasar a Almacén y (2) los que ya salieron o están en Almacén con saldo (crédito, paga al
+ * recibir), con el vencimiento del crédito. Cada uno con «Cobrar» (el mismo cobro de la vendedora). */
+function PorCobrarEquipo({ pedidos, onVerTodos }: { pedidos: ReturnType<typeof useAllOrders>['data']; onVerTodos: () => void }) {
+  const { byOrder: dinero } = useOrderMoney()
+  const [cobrando, setCobrando] = useState<(typeof pedidos)[number] | null>(null)
+  const conMonto = useMemo(() => pedidos.filter((o) => (o.total ?? 0) > 0), [pedidos])
+  const esperan = useMemo(() => pedidosPorConfirmar(conMonto, dinero).sort((a, b) => ((a.created_at ?? '') < (b.created_at ?? '') ? -1 : 1)), [conMonto, dinero])
+  const despues = useMemo(() => pedidosPorCobrarSinConfirmar(conMonto, dinero)
+    .sort((a, b) => Number(!!dinero[b.id]?.vencido) - Number(!!dinero[a.id]?.vencido) || ((dinero[a.id]?.due_date ?? '9') < (dinero[b.id]?.due_date ?? '9') ? -1 : 1)), [conMonto, dinero])
+  const saldo = (o: { id: string; total?: number | null }) => dinero[o.id]?.saldo ?? Number(o.total ?? 0)
+  const meta = (o: { shipping_meta?: unknown }) => (o.shipping_meta ?? {}) as { customer?: { name?: string }; seller?: string; placed_by?: string }
+  const quien = (o: { shipping_meta?: unknown }) => { const m = meta(o); return m.seller ? capitalizarNombre(m.seller) : m.placed_by ? `capturó ${m.placed_by.replace(/\s*\((Ventas|Dirección)\)\s*$/, '')}` : 'sin vendedor' }
+  const fila = (o: (typeof pedidos)[number], extra: string | null, testid: string) => (
+    <div key={o.id} className="taskrow" data-testid={testid}>
+      <span className="taskrow-tx">
+        <span className="taskrow-t">{capitalizarNombre(meta(o).customer?.name ?? '') || 'Cliente'} · {money(saldo(o))}</span>
+        <span className="taskrow-d"><span className="mono">{o.external_ref}</span> · {quien(o)} · pedido el {fmtDate(o.created_at)}{extra ? ` · ${extra}` : ''}</span>
+      </span>
+      <button type="button" className="btn sm" onClick={() => setCobrando(o)} data-testid={testid + '-cobrar'}>Cobrar</button>
+    </div>
+  )
+  const suma = (xs: typeof pedidos) => xs.reduce((s, o) => s + saldo(o), 0)
+  if (!esperan.length && !despues.length) return null
+  return (
+    <>
+      {esperan.length > 0 && (
+        <Seccion titulo={`Esperan pago para pasar a Almacén · ${money(suma(esperan))}`} nivel="atencion" conteo={esperan.length} id="dir-esperan-pago"
+          accion={esperan.length > 6 ? { label: `Ver los ${esperan.length}`, onClick: onVerTodos } : undefined}>
+          <div className="tasklist">{esperan.slice(0, 6).map((o) => fila(o, null, 'dir-espera-pago'))}</div>
+        </Seccion>
+      )}
+      {despues.length > 0 && (
+        <Seccion titulo={`Por cobrar ya surtidos · ${money(suma(despues))}`} nivel="continuar" conteo={despues.length} id="dir-por-cobrar">
+          <div className="tasklist">{despues.slice(0, 6).map((o) => {
+            const d = dinero[o.id]
+            const extra = d?.credito_autorizado ? (d.due_date ? `crédito ${d.vencido ? 'VENCIDO el' : 'vence el'} ${fmtDate(d.due_date)}` : 'crédito') : 'paga al recibir'
+            return fila(o, extra, 'dir-por-cobrar')
+          })}
+          {despues.length > 6 && <div className="taskrow rh-decision-mas">y {despues.length - 6} más</div>}</div>
+        </Seccion>
+      )}
+      {cobrando && <CobrarPedido pedido={cobrando} onClose={() => setCobrando(null)} onHecho={(t) => { setCobrando(null); toast(t) }} />}
+    </>
+  )
+}
+
 export const DECIDE_HOY = new Set(['cancelaciones', 'transfer', 'reembolso', 'disponer', 'sobrepago'])
 
 export function HomeDireccion() {
@@ -374,6 +425,9 @@ export function HomeDireccion() {
           <button type="button" className="rh-paso" onClick={() => irPaso('salio')} data-testid="dir-paso-salio"><b>{porPaso.salio}</b><span>En camino o para recoger</span></button>
         </div>
       </Seccion>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}><BotonCotizar /></div>
+      <PorCobrarEquipo pedidos={pedidosDir} onVerTodos={() => irPaso('por_confirmar')} />
+      <CotizacionesPorCerrar equipo />
       {/* DECIDE HOY / VIGILA (27 nov 2026, «sistema sencillo por rol») · «Pendientes» juntaba hasta 16 renglones del mismo
           peso. Arriba queda SOLO lo que está detenido hasta que Dirección responda; lo demás se vigila. Son los mismos
           renglones y llevan a las mismas pantallas: nada se quitó. */}

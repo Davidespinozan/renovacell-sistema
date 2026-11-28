@@ -37,6 +37,12 @@ export const cotizaciones = {
   enviar: (id: string, via: 'chat' | 'correo') => rpc<{ via: string; para?: string }>('cc_cotizacion_enviar', { p_cot: id, p_via: via }),
   convertida: (id: string, order: string) => rpc<{ idempotente: boolean }>('cc_cotizacion_convertida', { p_cot: id, p_order: order }),
   cancelar: (id: string) => rpc<{ idempotente: boolean }>('cc_cotizacion_cancelar', { p_cot: id }),
+  // SEGUIMIENTO (28 nov 2026) · las que siguen sin cerrar, para Inicio; y darle más días a una.
+  abiertas: async (): Promise<Res<CotizacionAbierta[]>> => {
+    const r = await rpc<CotizacionAbierta[] | null>('cotizaciones_abiertas', {})
+    return r.ok ? { ok: true, data: (r.data ?? []).map((c) => ({ ...c, total: Number(c.total) })) } : r
+  },
+  extender: (id: string, dias = 7) => rpc<{ vigente_hasta: string }>('cc_cotizacion_extender', { p_cot: id, p_dias: dias }),
   async deCliente(customer: string): Promise<Res<Cotizacion[]>> {
     if (!hasSupabase) return { ok: true, data: [] }
     const { data, error } = await supabase.from('cotizaciones' as never).select('*').eq('customer_id', customer).order('created_at', { ascending: false }).limit(10)
@@ -44,6 +50,27 @@ export const cotizaciones = {
   },
 }
 export type ClienteCotizaciones = typeof cotizaciones
+
+/** Cotización sin cerrar, como la regresa `cotizaciones_abiertas` (Inicio). */
+export interface CotizacionAbierta {
+  id: string; folio: string; customer_id: string; conversation_id: string | null; cliente: string | null; telefono: string | null; correo: string | null
+  total: number; lineas: LineaCotizacion[]; notas: string | null; vigente_hasta: string; created_at: string
+  enviada_chat_at: string | null; enviada_correo_at: string | null; vendedor: string | null; mia: boolean
+}
+
+const DIA = 86_400_000
+/** «Vence hoy», «vence en 3 días», «venció hace 2 días», con su tono. */
+export function vigenciaCotizacion(vigenteHasta: string, ahora = Date.now()): { texto: string; tono: 'ok' | 'warn' | 'dang'; vencida: boolean } {
+  const t = Date.parse(vigenteHasta)
+  if (t < ahora) { const d = Math.max(1, Math.floor((ahora - t) / DIA)); return { texto: `venció hace ${d} día${d === 1 ? '' : 's'}`, tono: 'dang', vencida: true } }
+  const d = Math.floor((t - ahora) / DIA)
+  if (d < 1) return { texto: 'vence hoy', tono: 'warn', vencida: false }
+  return { texto: `vence en ${d} día${d === 1 ? '' : 's'}`, tono: d <= 2 ? 'warn' : 'ok', vencida: false }
+}
+
+/** Carrito para «Levantar pedido» con los mismos productos y cantidades de la cotización. */
+export const carritoDeCotizacion = (c: Pick<CotizacionAbierta, 'lineas'>): Record<string, number> =>
+  Object.fromEntries(c.lineas.filter((l) => l.qty > 0).map((l) => [l.product_id, l.qty]))
 
 /** "Vencida" no se guarda: se deduce por fecha. */
 export const estadoVisible = (c: Pick<Cotizacion, 'estado' | 'vigente_hasta'>, ahora = Date.now()): 'vigente' | 'vencida' | 'convertida' | 'cancelada' =>
